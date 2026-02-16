@@ -2,17 +2,14 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 router = APIRouter()
 
-# Track active connections: lobby_id -> {player_id: websocket}
-active_connections: dict[str, dict[str, WebSocket]] = {}
+# Track active connections: username -> websocket
+active_connections: dict[str, WebSocket] = {}
 
 
-@router.websocket("/ws/{lobby_id}/{player_id}")
-async def game_ws(websocket: WebSocket, lobby_id: str, player_id: str):
+@router.websocket("/ws/{username}")
+async def game_ws(websocket: WebSocket, username: str):
     await websocket.accept()
-
-    if lobby_id not in active_connections:
-        active_connections[lobby_id] = {}
-    active_connections[lobby_id][player_id] = websocket
+    active_connections[username] = websocket
 
     try:
         while True:
@@ -20,20 +17,17 @@ async def game_ws(websocket: WebSocket, lobby_id: str, player_id: str):
             # TODO: route message to game engine based on data["type"]
             # e.g. "start_game", "propose_policy", "vote", "chat"
     except WebSocketDisconnect:
-        active_connections[lobby_id].pop(player_id, None)
-        if not active_connections[lobby_id]:
-            del active_connections[lobby_id]
+        active_connections.pop(username, None)
 
 
-async def broadcast(lobby_id: str, message: dict):
-    """Send a message to all players in a lobby."""
-    connections = active_connections.get(lobby_id, {})
-    for ws in connections.values():
+async def broadcast(message: dict):
+    """Send a message to all connected players."""
+    for ws in active_connections.values():
         await ws.send_json(message)
 
 
-async def send_to_player(lobby_id: str, player_id: str, message: dict):
+async def send_to_player(username: str, message: dict):
     """Send a private message to a specific player."""
-    ws = active_connections.get(lobby_id, {}).get(player_id)
+    ws = active_connections.get(username)
     if ws:
         await ws.send_json(message)

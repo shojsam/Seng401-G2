@@ -4,8 +4,8 @@ export class GameSocket {
   private socket: WebSocket | null = null;
   private handlers: Map<string, (data: any) => void> = new Map();
 
-  connect(lobbyId: string, playerId: string) {
-    this.socket = new WebSocket(`${WS_BASE}/ws/${lobbyId}/${playerId}`);
+  connect(username: string) {
+    this.socket = new WebSocket(`${WS_BASE}/ws/${username}`);
 
     this.socket.onopen = () => {
       console.log("WebSocket connected");

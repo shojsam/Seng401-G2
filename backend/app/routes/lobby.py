@@ -1,33 +1,36 @@
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from app.data.redis_client import redis_client
 
 router = APIRouter()
 
-
-@router.post("/")
-async def create_lobby():
-    # TODO: create lobby in Redis, record in MySQL
-    raise HTTPException(status_code=501, detail="Not implemented")
+LOBBY_KEY = "lobby:players"
 
 
-@router.get("/")
-async def list_lobbies():
-    # TODO: return joinable lobbies
-    raise HTTPException(status_code=501, detail="Not implemented")
+class JoinRequest(BaseModel):
+    username: str
 
 
-@router.get("/{lobby_id}")
-async def get_lobby(lobby_id: str):
-    # TODO: return lobby details
-    raise HTTPException(status_code=501, detail="Not implemented")
+@router.post("/join")
+async def join_lobby(req: JoinRequest):
+    username = req.username.strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="Username cannot be empty")
+    if redis_client.sismember(LOBBY_KEY, username):
+        raise HTTPException(status_code=409, detail="Username already taken in lobby")
+    redis_client.sadd(LOBBY_KEY, username)
+    return {"message": f"{username} joined the lobby", "username": username}
 
 
-@router.post("/{lobby_id}/join")
-async def join_lobby(lobby_id: str):
-    # TODO: add player to lobby
-    raise HTTPException(status_code=501, detail="Not implemented")
+@router.post("/leave")
+async def leave_lobby(req: JoinRequest):
+    username = req.username.strip()
+    redis_client.srem(LOBBY_KEY, username)
+    return {"message": f"{username} left the lobby"}
 
 
-@router.post("/{lobby_id}/leave")
-async def leave_lobby(lobby_id: str):
-    # TODO: remove player from lobby
-    raise HTTPException(status_code=501, detail="Not implemented")
+@router.get("/players")
+async def get_players():
+    players = redis_client.smembers(LOBBY_KEY)
+    return {"players": list(players)}
