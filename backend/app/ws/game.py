@@ -15,7 +15,7 @@ async def game_ws(websocket: WebSocket, username: str):
         while True:
             data = await websocket.receive_json()
             # TODO: route message to game engine based on data["type"]
-            # e.g. "start_game", "propose_policy", "vote", "chat"
+            # e.g. "start_game", "propose_policy", "vote"
     except WebSocketDisconnect:
         active_connections.pop(username, None)
 
