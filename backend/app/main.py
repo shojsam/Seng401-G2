@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import lobby, match
+from app.routes import lobby
 from app.ws import game
 
 app = FastAPI(title="GreenWatch", version="0.1.0")
@@ -16,7 +16,6 @@ app.add_middleware(
 
 # REST routes
 app.include_router(lobby.router, prefix="/lobby", tags=["lobby"])
-app.include_router(match.router, prefix="/matches", tags=["matches"])
 
 # WebSocket
 app.include_router(game.router, tags=["game"])
