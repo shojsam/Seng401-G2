@@ -1,20 +1,39 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+import mysql.connector
+from mysql.connector import pooling, Error
+import os
 
-from app.config import DATABASE_URL
+db_config = {
+    "host": "localhost",
+    "user": "root",
+    "password": "root",
+    "database": "card_game_db"
+}
 
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+try:
+    connection_pool = mysql.connector.pooling.MySQLConnectionPool(
+        pool_name="card_game_pool",
+        pool_size=5,
+        **db_config
+    )
+    print("Connection pool created successfully")
+except Error as e:
+    print(f"Error creating connection pool: {e}")
 
+def get_connection():
+    return connection_pool.get_connection()
 
-def get_db():
-    db = SessionLocal()
+def execute_query(query, params=None, fetch=False):
+    """Generic helper to execute SQL and handle connections."""
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True) # Returns results as dicts
     try:
-        yield db
+        cursor.execute(query, params or ())
+        if fetch:
+            return cursor.fetchall()
+        conn.commit()
+    except Error as e:
+        print(f"Query Error: {e}")
+        conn.rollback()
     finally:
-        db.close()
-
-
-def init_db():
-    Base.metadata.create_all(bind=engine)
+        cursor.close()
+        conn.close()

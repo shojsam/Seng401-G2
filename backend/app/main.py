@@ -5,6 +5,8 @@ from app.data.database import init_db
 from app.routes import lobby, results
 from app.ws import game
 
+from app.data import repositories
+
 app = FastAPI(title="GreenWatch", version="0.1.0")
 
 app.add_middleware(
@@ -31,3 +33,10 @@ def on_startup():
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+
+
+
+@app.get("/cards")
+def read_cards():
+    return repositories.get_all_cards()

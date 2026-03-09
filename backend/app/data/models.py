@@ -1,12 +1,35 @@
-from sqlalchemy import Column, Integer, String, DateTime
-from sqlalchemy.sql import func
+from app.data.database import db_pool # Using the pool we created earlier
 
-from app.data.database import Base
+def save_game_result(winner_name: str):
+    """
+    Inserts a new game result into the database.
+    The 'id' and 'played_at' are handled automatically by MySQL.
+    """
+    connection = db_pool.get_connection()
+    cursor = connection.cursor()
+    
+    try:
+        query = "INSERT INTO game_results (winner) VALUES (%s)"
+        cursor.execute(query, (winner_name,))
+        connection.commit()
+        print(f"Game result saved for {winner_name}")
+    except Exception as e:
+        print(f"Error saving game result: {e}")
+        connection.rollback()
+    finally:
+        cursor.close()
+        connection.close()
 
-
-class GameResult(Base):
-    __tablename__ = "game_results"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    winner = Column(String(20), nullable=False)
-    played_at = Column(DateTime, server_default=func.now())
+def get_recent_results(limit=10):
+    """Fetches the latest game results."""
+    connection = db_pool.get_connection()
+    # Use dictionary=True so it looks like your old SQLAlchemy objects
+    cursor = connection.cursor(dictionary=True) 
+    
+    try:
+        query = "SELECT * FROM game_results ORDER BY played_at DESC LIMIT %s"
+        cursor.execute(query, (limit,))
+        return cursor.fetchall()
+    finally:
+        cursor.close()
+        connection.close()
