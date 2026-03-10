@@ -1,13 +1,8 @@
-from app.data.database import db_pool # Using the pool we created earlier
+from database import db_pool 
 
 def save_game_result(winner_name: str):
-    """
-    Inserts a new game result into the database.
-    The 'id' and 'played_at' are handled automatically by MySQL.
-    """
     connection = db_pool.get_connection()
     cursor = connection.cursor()
-    
     try:
         query = "INSERT INTO game_results (winner) VALUES (%s)"
         cursor.execute(query, (winner_name,))

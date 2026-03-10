@@ -1,6 +1,5 @@
 import mysql.connector
 from mysql.connector import pooling, Error
-import os
 
 db_config = {
     "host": "localhost",
@@ -10,9 +9,10 @@ db_config = {
 }
 
 try:
-    connection_pool = mysql.connector.pooling.MySQLConnectionPool(
+    # Renamed to db_pool for consistency across your models
+    db_pool = mysql.connector.pooling.MySQLConnectionPool(
         pool_name="card_game_pool",
-        pool_size=5,
+        pool_size=5,  #number of players per game 
         **db_config
     )
     print("Connection pool created successfully")
@@ -20,12 +20,11 @@ except Error as e:
     print(f"Error creating connection pool: {e}")
 
 def get_connection():
-    return connection_pool.get_connection()
+    return db_pool.get_connection()
 
 def execute_query(query, params=None, fetch=False):
-    """Generic helper to execute SQL and handle connections."""
     conn = get_connection()
-    cursor = conn.cursor(dictionary=True) # Returns results as dicts
+    cursor = conn.cursor(dictionary=True) 
     try:
         cursor.execute(query, params or ())
         if fetch:
