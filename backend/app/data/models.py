@@ -1,4 +1,4 @@
-from database import db_pool 
+from .database import db_pool 
 
 def save_game_result(winner_name: str):
     connection = db_pool.get_connection()

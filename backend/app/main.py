@@ -1,11 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.data.database import init_db
-from app.routes import lobby, results
-from app.ws import game
+from data.database import get_connection
+from routes import lobby, results
+from ws import game
 
-from app.data import repositories
+from data import repository
 
 app = FastAPI(title="GreenWatch", version="0.1.0")
 
@@ -27,7 +27,7 @@ app.include_router(game.router, tags=["game"])
 
 @app.on_event("startup")
 def on_startup():
-    init_db()
+    get_connection()
 
 
 @app.get("/health")
@@ -39,4 +39,4 @@ async def health_check():
 
 @app.get("/cards")
 def read_cards():
-    return repositories.get_all_cards()
+    return repository.get_all_cards()
