@@ -11,25 +11,25 @@ db_pool = None
 
 
 def _build_db_config():
- database_url = os.getenv("DATABASE_URL")
- print(f"DEBUG: DATABASE_URL = {database_url}")  # Add this line
- if database_url:
-    parsed = urlparse(database_url)
-    print(f"DEBUG: Parsed host = {parsed.hostname}")  # Add this line
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        parsed = urlparse(database_url)
+        return {
+            "host": parsed.hostname or "localhost",
+            "port": parsed.port or 3306,
+            "user": parsed.username or "root",
+            "password": parsed.password or "",
+            "database": (parsed.path or "").lstrip("/") or "card_game_db",
+        }
+
     return {
-    "host": parsed.hostname or "localhost",
-    "port": parsed.port or 3306,
-    "user": parsed.username or "root",
-    "password": parsed.password or "",
-    "database": (parsed.path or "").lstrip("/") or "card_game_db",
+        "host": os.getenv("DB_HOST", "localhost"),
+        "port": int(os.getenv("DB_PORT", "3306")),
+        "user": os.getenv("DB_USER", "root"),
+        "password": os.getenv("DB_PASSWORD", "root"),
+        "database": os.getenv("DB_NAME", "card_game_db"),
     }
- return {
- "host": os.getenv("DB_HOST", "localhost"),
- "port": int(os.getenv("DB_PORT", "3306")),
- "user": os.getenv("DB_USER", "root"),
- "password": os.getenv("DB_PASSWORD", "root"),
- "database": os.getenv("DB_NAME", "card_game_db"),
- }
+
 
 def _get_pool():
     global db_pool
@@ -59,4 +59,6 @@ def execute_query(query, params=None, fetch=False):
         conn.rollback()
     finally:
         cursor.close()
+        conn.close()
+ cursor.close()
         conn.close()
