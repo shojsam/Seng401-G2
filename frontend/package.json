@@ -1,18 +1,17 @@
 {
-  "name": "greenwatch-frontend",
-  "version": "0.1.0",
+  "name": "frontend",
   "private": true,
-  "type": "module",
+  "version": "1.0.0",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
-    "phaser": "^3.87.0"
+    "phaser": "^3.80.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
-    "vite": "^6.0.0"
+    "vite": "^5.0.0",
+    "typescript": "^5.0.0"
   }
 }
