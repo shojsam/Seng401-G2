@@ -27,7 +27,12 @@ app.include_router(game.router, tags=["game"])
 
 @app.on_event("startup")
 def on_startup():
-    get_connection()
+    try:
+        conn = get_connection()
+        conn.close()
+    except Exception as exc:
+        # Allow the service to boot even if the database is not reachable yet.
+        print(f"Database connection unavailable at startup: {exc}")
 
 
 @app.get("/health")

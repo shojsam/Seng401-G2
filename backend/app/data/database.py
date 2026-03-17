@@ -1,26 +1,50 @@
+import os
+from urllib.parse import urlparse
+
 import mysql.connector
-from mysql.connector import pooling, Error
+from mysql.connector import Error, pooling
+from dotenv import load_dotenv
 
-db_config = {
-    "host": "localhost",
-    "user": "root",
-    "password": "root",
-    "database": "card_game_db"
-}
+load_dotenv()
 
-try:
-    # Renamed to db_pool for consistency across your models
-    db_pool = mysql.connector.pooling.MySQLConnectionPool(
-        pool_name="card_game_pool",
-        pool_size=5,  #number of players per game 
-        **db_config
-    )
-    print("Connection pool created successfully")
-except Error as e:
-    print(f"Error creating connection pool: {e}")
+db_pool = None
+
+
+def _build_db_config():
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        parsed = urlparse(database_url)
+        return {
+            "host": parsed.hostname or "localhost",
+            "port": parsed.port or 3306,
+            "user": parsed.username or "root",
+            "password": parsed.password or "",
+            "database": (parsed.path or "").lstrip("/") or "card_game_db",
+        }
+
+    return {
+        "host": os.getenv("DB_HOST", "localhost"),
+        "port": int(os.getenv("DB_PORT", "3306")),
+        "user": os.getenv("DB_USER", "root"),
+        "password": os.getenv("DB_PASSWORD", "root"),
+        "database": os.getenv("DB_NAME", "card_game_db"),
+    }
+
+
+def _get_pool():
+    global db_pool
+    if db_pool is None:
+        db_pool = pooling.MySQLConnectionPool(
+            pool_name="card_game_pool",
+            pool_size=5,
+            **_build_db_config(),
+        )
+        print("Connection pool created successfully")
+    return db_pool
+
 
 def get_connection():
-    return db_pool.get_connection()
+    return _get_pool().get_connection()
 
 def execute_query(query, params=None, fetch=False):
     conn = get_connection()
