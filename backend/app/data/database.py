@@ -46,9 +46,10 @@ def _get_pool():
 def get_connection():
     return _get_pool().get_connection()
 
+
 def execute_query(query, params=None, fetch=False):
     conn = get_connection()
-    cursor = conn.cursor(dictionary=True) 
+    cursor = conn.cursor(dictionary=True)
     try:
         cursor.execute(query, params or ())
         if fetch:
@@ -59,6 +60,4 @@ def execute_query(query, params=None, fetch=False):
         conn.rollback()
     finally:
         cursor.close()
-        conn.close()
- cursor.close()
         conn.close()
