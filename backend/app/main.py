@@ -1,11 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from data.database import get_connection
-from routes import lobby, results
-from ws import game
-
-from data import repository
+from .data.database import get_connection
+from .routes import lobby, results
+from .ws import game
+from .data import repository
 
 app = FastAPI(title="GreenWatch", version="0.1.0")
 

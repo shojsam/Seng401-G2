@@ -1,8 +1,8 @@
 from enum import Enum
 
-from app.logic.roles import Role, assign_roles, get_exploiter_ids
-from app.logic.deck import PolicyCard, PolicyType, deal_hands
-from app.logic.voting import Vote, resolve_votes
+from .roles import Role, assign_roles, get_exploiter_ids
+from .deck import PolicyCard, PolicyType, deal_hands
+from .voting import Vote, resolve_votes
 
 
 class Phase(str, Enum):
