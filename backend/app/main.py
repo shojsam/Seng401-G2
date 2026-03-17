@@ -5,6 +5,13 @@ from .data.database import get_connection
 from .routes import lobby, results
 from .ws import game
 from .data import repository
+import os
+
+MYSQL_HOST = os.getenv('MYSQL_HOST', 'localhost')
+MYSQL_PORT = os.getenv('MYSQL_PORT', '3306')
+MYSQL_USER = os.getenv('MYSQL_USER')
+MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD')
+MYSQL_DATABASE = os.getenv('MYSQL_DATABASE')
 
 app = FastAPI(title="GreenWatch", version="0.1.0")
 
