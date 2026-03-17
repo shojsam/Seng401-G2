@@ -7,7 +7,7 @@ def seed_database():
     try:
         # 1. Populate CARDS
         print("Populating cards...")
-        cards_data = [
+        cards_data = [    #needs to be the actual cards
             ('Ace of Spades', 'Spade', 'The highest value card in the deck.'),
             ('King of Hearts', 'Heart', 'A powerful royal card.'),
             ('Queen of Diamonds', 'Diamond', 'A versatile strategy card.'),
