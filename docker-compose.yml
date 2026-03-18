@@ -23,11 +23,11 @@ services:
       db:
         condition: service_healthy
     environment:
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_USER: root
-      DB_PASSWORD: root
-      DB_NAME: card_game_db
+      MYSQLHOST: db
+      MYSQLPORT: 3306
+      MYSQLUSER: root
+      MYSQLPASSWORD: root
+      MYSQLDATABASE: card_game_db
     ports:
       - "8000:8000"
 
