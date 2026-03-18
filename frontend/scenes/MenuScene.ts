@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { joinLobby } from "../src/api";
 
 /**
  * Asset paths — adjust these to match your project's asset directory.
@@ -146,7 +147,7 @@ export class MenuScene extends Phaser.Scene {
     );
     const joinMessage = this.buildMessage();
 
-    joinButton.onclick = () => {
+    joinButton.onclick = async () => {
       const lobby = lobbyInput.value.trim();
       const username = joinNameInput.value.trim();
 
@@ -156,11 +157,21 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
 
+      joinButton.disabled = true;
       joinMessage.style.color = "#ccf0c8";
       joinMessage.textContent = `Joining ${lobby} as ${username}...`;
 
-      this.cleanup();
-      this.scene.start("BoardGameScene");
+      try {
+        await joinLobby(username);
+        this.cleanup();
+        this.scene.start("BoardGameScene", { username, lobbyCode: lobby });
+      } catch (error) {
+        joinMessage.style.color = "#ffd3c8";
+        joinMessage.textContent =
+          error instanceof Error ? error.message : "Failed to join the lobby.";
+      } finally {
+        joinButton.disabled = false;
+      }
     };
 
     const enterJoin = (e: KeyboardEvent) => {
@@ -198,7 +209,7 @@ export class MenuScene extends Phaser.Scene {
     );
     const createMessage = this.buildMessage();
 
-    createButton.onclick = () => {
+    createButton.onclick = async () => {
       const username = createNameInput.value.trim();
 
       if (!username) {
@@ -207,8 +218,21 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
 
+      createButton.disabled = true;
       createMessage.style.color = "#cfe2ff";
       createMessage.textContent = `Creating a new session for ${username}...`;
+
+      try {
+        await joinLobby(username);
+        this.cleanup();
+        this.scene.start("BoardGameScene", { username, lobbyCode: "MAIN" });
+      } catch (error) {
+        createMessage.style.color = "#ffd3c8";
+        createMessage.textContent =
+          error instanceof Error ? error.message : "Failed to create the lobby.";
+      } finally {
+        createButton.disabled = false;
+      }
     };
 
     createNameInput.addEventListener("keydown", (e: KeyboardEvent) => {
