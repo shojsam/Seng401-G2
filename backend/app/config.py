@@ -3,4 +3,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "mysql+pymysql://user:password@localhost:3306/greenwatch")
+MYSQLHOST = os.getenv("MYSQLHOST", "localhost")
+MYSQLPORT = int(os.getenv("MYSQLPORT", "3306"))
+MYSQLUSER = os.getenv("MYSQLUSER", "root")
+MYSQLPASSWORD = os.getenv("MYSQLPASSWORD", "root")
+MYSQLDATABASE = os.getenv("MYSQLDATABASE", "card_game_db")

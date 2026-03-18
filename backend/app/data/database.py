@@ -1,5 +1,4 @@
 import os
-from urllib.parse import urlparse
 
 import mysql.connector
 from mysql.connector import Error, pooling
@@ -11,23 +10,12 @@ db_pool = None
 
 
 def _build_db_config():
-    database_url = os.getenv("DATABASE_URL")
-    if database_url:
-        parsed = urlparse(database_url)
-        return {
-            "host": parsed.hostname or "localhost",
-            "port": parsed.port or 3306,
-            "user": parsed.username or "root",
-            "password": parsed.password or "",
-            "database": (parsed.path or "").lstrip("/") or "card_game_db",
-        }
-
     return {
-        "host": os.getenv("DB_HOST", "localhost"),
-        "port": int(os.getenv("DB_PORT", "3306")),
-        "user": os.getenv("DB_USER", "root"),
-        "password": os.getenv("DB_PASSWORD", "root"),
-        "database": os.getenv("DB_NAME", "card_game_db"),
+        "host": os.getenv("MYSQLHOST", "localhost"),
+        "port": int(os.getenv("MYSQLPORT", "3306")),
+        "user": os.getenv("MYSQLUSER", "root"),
+        "password": os.getenv("MYSQLPASSWORD", "root"),
+        "database": os.getenv("MYSQLDATABASE", "card_game_db"),
     }
 
 
