@@ -1,7 +1,15 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from ..state.lobbies import create_lobby, get_lobby, normalize_lobby_code, remove_player
+from ..state.lobbies import (
+    LobbyPlayerExistsError,
+    add_player,
+    create_lobby,
+    get_lobby,
+    get_lobby_players,
+    normalize_lobby_code,
+    remove_player,
+)
 
 router = APIRouter()
 
@@ -22,7 +30,12 @@ async def create_lobby_route(req: CreateLobbyRequest):
         raise HTTPException(status_code=400, detail="Username cannot be empty")
 
     lobby = create_lobby()
-    lobby.players.add(username)
+    try:
+        lobby = add_player(lobby.code, username)
+    except LobbyPlayerExistsError:
+        raise HTTPException(status_code=409, detail="Username already taken in lobby") from None
+    if lobby is None:
+        raise HTTPException(status_code=500, detail="Failed to create lobby")
     return {
         "message": f"{username} created lobby {lobby.code}",
         "username": username,
@@ -46,7 +59,12 @@ async def join_lobby(req: JoinRequest):
     if username in lobby.players:
         raise HTTPException(status_code=409, detail="Username already taken in lobby")
 
-    lobby.players.add(username)
+    try:
+        lobby = add_player(lobby.code, username)
+    except LobbyPlayerExistsError:
+        raise HTTPException(status_code=409, detail="Username already taken in lobby") from None
+    if lobby is None:
+        raise HTTPException(status_code=404, detail="Lobby not found")
     return {
         "message": f"{username} joined lobby {lobby.code}",
         "username": username,
@@ -68,7 +86,8 @@ async def leave_lobby(req: JoinRequest):
 
 @router.get("/{lobby_code}/players")
 async def get_players(lobby_code: str):
-    lobby = get_lobby(lobby_code)
-    if lobby is None:
+    players = get_lobby_players(lobby_code)
+    normalized_code = normalize_lobby_code(lobby_code)
+    if players is None:
         raise HTTPException(status_code=404, detail="Lobby not found")
-    return {"lobby_code": lobby.code, "players": list(lobby.players)}
+    return {"lobby_code": normalized_code, "players": players}

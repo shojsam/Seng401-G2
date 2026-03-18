@@ -15,7 +15,7 @@ def _build_db_config():
         "port": int(os.getenv("MYSQLPORT", "3306")),
         "user": os.getenv("MYSQLUSER", "root"),
         "password": os.getenv("MYSQLPASSWORD", "root"),
-        "database": os.getenv("MYSQLDATABASE", "card_game_db"),
+        "database": os.getenv("MYSQLDATABASE", "green_db"),
     }
 
 

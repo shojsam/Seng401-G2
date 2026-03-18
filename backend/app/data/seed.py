@@ -8,7 +8,7 @@ def initialize_database():
     cursor = connection.cursor()
 
     try:
-        required_tables = {"users", "games", "game_players", "cards"}
+        required_tables = {"users", "games", "game_players", "cards", "lobbies", "lobby_players"}
         cursor.execute("SHOW TABLES")
         existing_tables = {row[0] for row in cursor.fetchall()}
         if required_tables.issubset(existing_tables):
@@ -28,6 +28,10 @@ def initialize_database():
             if statement.upper().startswith("USE "):
                 if current_db:
                     connection.database = current_db
+                continue
+            if statement.upper().startswith("SET FOREIGN_KEY_CHECKS"):
+                continue
+            if statement.upper().startswith("DROP TABLE"):
                 continue
             cursor.execute(statement)
 

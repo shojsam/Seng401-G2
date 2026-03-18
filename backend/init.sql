@@ -1,6 +1,6 @@
 -- 1. Setup the Database
-CREATE DATABASE IF NOT EXISTS card_game_db;
-USE card_game_db;
+CREATE DATABASE IF NOT EXISTS green_db;
+USE green_db;
 
 -- 2. Disable Foreign Key Checks
 SET FOREIGN_KEY_CHECKS = 0;
@@ -8,6 +8,8 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- 3. Drop all tables to start fresh
 DROP TABLE IF EXISTS game_players;
 DROP TABLE IF EXISTS games;
+DROP TABLE IF EXISTS lobby_players;
+DROP TABLE IF EXISTS lobbies;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS cards;
 
@@ -15,7 +17,7 @@ DROP TABLE IF EXISTS cards;
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- USERS TABLE
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
@@ -26,14 +28,33 @@ CREATE TABLE users (
 );
 
 -- GAMES TABLE
-CREATE TABLE games (
+CREATE TABLE IF NOT EXISTS games (
     game_id INT AUTO_INCREMENT PRIMARY KEY,
     game_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     status ENUM('active', 'completed', 'cancelled') DEFAULT 'completed'
 );
 
+-- LOBBIES TABLE
+CREATE TABLE IF NOT EXISTS lobbies (
+    lobby_id INT AUTO_INCREMENT PRIMARY KEY,
+    lobby_code CHAR(6) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- LOBBY PLAYERS TABLE
+CREATE TABLE IF NOT EXISTS lobby_players (
+    lobby_player_id INT AUTO_INCREMENT PRIMARY KEY,
+    lobby_id INT NOT NULL,
+    username VARCHAR(50) NOT NULL,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_lobby_player_lobby
+        FOREIGN KEY (lobby_id) REFERENCES lobbies(lobby_id)
+        ON DELETE CASCADE,
+    UNIQUE (lobby_id, username)
+);
+
 -- GAME PLAYERS TABLE
-CREATE TABLE game_players (
+CREATE TABLE IF NOT EXISTS game_players (
     game_player_id INT AUTO_INCREMENT PRIMARY KEY,
     game_id INT NOT NULL,
     user_id INT NOT NULL,
@@ -50,7 +71,7 @@ CREATE TABLE game_players (
 );
 
 -- CARDS TABLE
-CREATE TABLE cards (
+CREATE TABLE IF NOT EXISTS cards (
     card_id INT AUTO_INCREMENT PRIMARY KEY,
     card_name VARCHAR(50) NOT NULL,
     card_type VARCHAR(50) NOT NULL,

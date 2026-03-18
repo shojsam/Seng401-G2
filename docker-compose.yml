@@ -6,7 +6,7 @@ services:
       - local-db
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: card_game_db
+      MYSQL_DATABASE: green_db
     volumes:
       - mysql_data:/var/lib/mysql
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
