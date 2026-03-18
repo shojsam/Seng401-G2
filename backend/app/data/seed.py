@@ -1,4 +1,4 @@
-from database import get_connection
+from app.data.database import get_connection
 
 def seed_database():
     conn = get_connection()
