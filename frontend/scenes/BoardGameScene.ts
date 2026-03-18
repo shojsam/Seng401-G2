@@ -1,13 +1,5 @@
 import Phaser from "phaser";
-
-/**
- * Asset keys and paths — place images in your public/assets folder:
- *
- *   board_bg.png          → UN courtroom background
- *   card_sustainable.png  → Blue "SUSTAINABLE" card holder (transparent bg)
- *   card_exploitative.png → Red "EXPLOITATIVE" card holder (transparent bg)
- *   player_basecard.png   → Player card background used in the HUD
- */
+import { createGameSocket, getLobbyPlayers, leaveLobby } from "../src/api";
 
 const ASSETS = {
   board_bg: "assets/board_bg.png",
@@ -20,7 +12,6 @@ const HUD_HEIGHT = 250;
 const BORDER_HEIGHT = 3;
 const TOTAL_HUD = HUD_HEIGHT + BORDER_HEIGHT;
 
-/** Placeholder player data — replace with real game state later */
 interface PlayerData {
   name: string;
   role?: string;
@@ -28,24 +19,33 @@ interface PlayerData {
   isEliminated?: boolean;
 }
 
+type BoardSceneData = {
+  username?: string;
+  lobbyCode?: string;
+};
+
+type SocketMessage = {
+  type?: string;
+  data?: Record<string, unknown>;
+};
+
 export class BoardGameScene extends Phaser.Scene {
   private players: PlayerData[] = [];
   private hudEl?: HTMLDivElement;
+  private statusEl?: HTMLDivElement;
   private sustainableHolder!: Phaser.GameObjects.Image;
   private exploitativeHolder!: Phaser.GameObjects.Image;
+  private username = "";
+  private lobbyCode = "MAIN";
+  private socket?: WebSocket;
 
-  // Track policy counts for the card holders
-  private sustainableCount: number = 0;
-  private exploitativeCount: number = 0;
-
-  // Track resize listener so we can clean it up
+  private sustainableCount = 0;
+  private exploitativeCount = 0;
   private resizeHandler?: () => void;
 
   constructor() {
     super({ key: "BoardGameScene" });
   }
-
-  // ─── PRELOAD ──────────────────────────────────────────────────────
 
   preload() {
     this.load.image("board_bg", ASSETS.board_bg);
@@ -54,42 +54,32 @@ export class BoardGameScene extends Phaser.Scene {
     this.load.image("player_basecard", ASSETS.player_basecard);
   }
 
-  // ─── CREATE ───────────────────────────────────────────────────────
-
   create() {
-    // Enable native browser scrolling (MenuScene uses it too)
+    const data = (this.scene.settings.data as BoardSceneData | undefined) ?? {};
+    this.username = (data.username ?? "").trim();
+    this.lobbyCode = (data.lobbyCode ?? "MAIN").trim() || "MAIN";
+
     document.body.style.overflowX = "hidden";
     document.body.style.overflowY = "auto";
     document.documentElement.style.overflowX = "hidden";
     document.documentElement.style.overflowY = "auto";
 
-    // ── Placeholder players (replace with lobby data) ─────────────
-    this.players = [
-      { name: "Player 1" },
-      { name: "Player 2" },
-      { name: "Player 3" },
-      { name: "Player 4" },
-      { name: "Player 5" },
-      { name: "Player 6" },
-    ];
+    this.players = this.username ? [{ name: this.username }] : [];
 
-    // ── Layout everything ─────────────────────────────────────────
     this.layoutScene();
     this.createHUD();
+    this.createStatusPanel();
 
-    // ── Handle window resize ──────────────────────────────────────
     this.resizeHandler = () => this.layoutScene();
     window.addEventListener("resize", this.resizeHandler);
 
     this.events.on("shutdown", this.cleanup, this);
     this.events.on("destroy", this.cleanup, this);
 
-    // ── Launch the RoleScene overlay in parallel ──────────────────
     if (!this.scene.isActive("RoleScene")) {
       this.scene.launch("RoleScene", { role: "reformer" });
     }
 
-    // ── Launch the VotingScene overlay in parallel ────────────────
     if (!this.scene.isActive("VotingScene")) {
       this.scene.launch("VotingScene", {
         nominatorName: "Player 1",
@@ -97,7 +87,6 @@ export class BoardGameScene extends Phaser.Scene {
       });
     }
 
-    // ── Launch the NominationScene overlay in parallel ────────────
     if (!this.scene.isActive("NominationScene")) {
       this.scene.launch("NominationScene", {
         players: [
@@ -109,29 +98,22 @@ export class BoardGameScene extends Phaser.Scene {
         ],
       });
     }
-  }
 
-  // ─── LAYOUT (canvas-based content) ────────────────────────────────
+    void this.syncLobbyState();
+    this.connectWebSocket();
+  }
 
   private layoutScene() {
     const width = window.innerWidth;
-
-    // Calculate background height from its natural aspect ratio
     const bgTex = this.textures.get("board_bg").getSourceImage();
     const bgAspect = bgTex.height / bgTex.width;
     const bgDisplayH = width * bgAspect;
-
-    // Total canvas height = HUD space + background at natural aspect ratio
     const totalH = Math.max(TOTAL_HUD + bgDisplayH, window.innerHeight);
 
-    // Resize the Phaser game canvas to fit all content
     this.scale.resize(width, totalH);
-
-    // Also explicitly size the canvas element so the page is scrollable
     this.game.canvas.style.width = `${width}px`;
     this.game.canvas.style.height = `${totalH}px`;
 
-    // ── Background ────────────────────────────────────────────────
     const oldBg = this.children.list.find(
       (c) => c instanceof Phaser.GameObjects.Image && c.texture.key === "board_bg"
     );
@@ -141,21 +123,25 @@ export class BoardGameScene extends Phaser.Scene {
     bg.setDisplaySize(width, bgDisplayH);
     bg.setDepth(0);
 
-    // Dim overlay
-    const dimOverlay = this.add.rectangle(width / 2, TOTAL_HUD + bgDisplayH / 2, width, bgDisplayH, 0x353b42, 0.8);
+    const dimOverlay = this.add.rectangle(
+      width / 2,
+      TOTAL_HUD + bgDisplayH / 2,
+      width,
+      bgDisplayH,
+      0x353b42,
+      0.8
+    );
     dimOverlay.setDepth(1);
 
-    // Fill area above background (behind HUD) with solid color
     const oldHudBg = this.children.list.find(
-      (c) => c instanceof Phaser.GameObjects.Rectangle && (c as any).name === "hud_bg_fill"
+      (c) => c instanceof Phaser.GameObjects.Rectangle && (c as { name?: string }).name === "hud_bg_fill"
     );
     if (oldHudBg) oldHudBg.destroy();
 
     const hudBgFill = this.add.rectangle(width / 2, TOTAL_HUD / 2, width, TOTAL_HUD, 0x0d1b2a, 1);
-    (hudBgFill as any).name = "hud_bg_fill";
+    (hudBgFill as { name?: string }).name = "hud_bg_fill";
     hudBgFill.setDepth(0);
 
-    // ── Card Holders ──────────────────────────────────────────────
     this.layoutCardHolders(width, bgDisplayH);
   }
 
@@ -168,13 +154,11 @@ export class BoardGameScene extends Phaser.Scene {
     const rightCenterX = width * 0.75;
     const targetW = width * 0.38;
 
-    // ── Sustainable (green) — LEFT ─────────────────────────────────
     this.sustainableHolder = this.add.image(leftCenterX, holderY, "card_sustainable");
     const susTexW = this.sustainableHolder.texture.getSourceImage().width;
     this.sustainableHolder.setScale(targetW / susTexW);
     this.sustainableHolder.setDepth(5);
 
-    // ── Exploitative (red) — RIGHT ────────────────────────────────
     this.exploitativeHolder = this.add.image(rightCenterX, holderY, "card_exploitative");
     const expTexW = this.exploitativeHolder.texture.getSourceImage().width;
     this.exploitativeHolder.setScale(targetW / expTexW);
@@ -204,9 +188,11 @@ export class BoardGameScene extends Phaser.Scene {
       borderBottom: `${BORDER_HEIGHT}px solid #d4a843`,
       boxSizing: "content-box",
       fontFamily: '"Jersey 20", sans-serif',
+      flexWrap: "wrap",
+      padding: "12px",
     });
 
-    this.players.forEach((player, i) => {
+    this.players.forEach((player) => {
       const card = document.createElement("div");
       Object.assign(card.style, {
         width: "150px",
@@ -251,7 +237,103 @@ export class BoardGameScene extends Phaser.Scene {
     this.hudEl = hud;
   }
 
-  // ─── PUBLIC API (for game logic to call) ──────────────────────────
+  private createStatusPanel() {
+    const existing = document.getElementById("board-status");
+    if (existing) existing.remove();
+
+    const parent = document.getElementById("game-container") ?? document.body;
+    const status = document.createElement("div");
+    status.id = "board-status";
+    Object.assign(status.style, {
+      position: "absolute",
+      top: `${TOTAL_HUD + 12}px`,
+      right: "12px",
+      zIndex: "110",
+      padding: "12px 16px",
+      background: "rgba(13, 27, 42, 0.9)",
+      color: "#f4efe7",
+      border: "2px solid #d4a843",
+      borderRadius: "12px",
+      fontFamily: '"Jersey 20", sans-serif',
+      fontSize: "24px",
+      lineHeight: "1.2",
+      minWidth: "220px",
+      boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
+    });
+    parent.appendChild(status);
+    this.statusEl = status;
+    this.setStatus("Connecting to backend...");
+  }
+
+  private setStatus(message: string) {
+    if (!this.statusEl) return;
+    this.statusEl.innerHTML = `Player: ${this.username || "Unknown"}<br/>Lobby: ${this.lobbyCode}<br/>${message}`;
+  }
+
+  private async syncLobbyState() {
+    try {
+      const data = await getLobbyPlayers();
+      this.updatePlayers(data.players.map((name) => ({ name })));
+      this.setStatus(`Lobby synced (${data.players.length} players)`);
+    } catch (error) {
+      this.setStatus(
+        error instanceof Error ? `Lobby sync failed: ${error.message}` : "Lobby sync failed"
+      );
+    }
+  }
+
+  private connectWebSocket() {
+    if (!this.username) {
+      this.setStatus("Missing player name");
+      return;
+    }
+
+    this.socket?.close();
+    const socket = createGameSocket(this.username);
+    this.socket = socket;
+
+    socket.addEventListener("open", () => {
+      this.setStatus("WebSocket connected");
+    });
+
+    socket.addEventListener("message", (event) => {
+      try {
+        const message = JSON.parse(event.data) as SocketMessage;
+
+        if (message.type === "lobby_update") {
+          const players = Array.isArray(message.data?.players)
+            ? (message.data.players as string[])
+            : [];
+          this.updatePlayers(players.map((name) => ({ name })));
+          this.setStatus(`Live lobby update (${players.length} players)`);
+          return;
+        }
+
+        if (message.type === "player_disconnected") {
+          const disconnectedUser = String(message.data?.username ?? "A player");
+          this.setStatus(`${disconnectedUser} disconnected`);
+          return;
+        }
+
+        if (message.type === "error") {
+          const backendMessage = String(message.data?.message ?? "Unknown backend error");
+          this.setStatus(`Backend error: ${backendMessage}`);
+        }
+      } catch {
+        this.setStatus("Received invalid socket message");
+      }
+    });
+
+    socket.addEventListener("close", () => {
+      if (this.socket === socket) {
+        this.setStatus("WebSocket disconnected");
+      }
+    });
+
+    socket.addEventListener("error", () => {
+      this.setStatus("WebSocket connection failed");
+    });
+  }
 
   public updatePlayers(players: PlayerData[]) {
     this.players = players;
@@ -287,26 +369,41 @@ export class BoardGameScene extends Phaser.Scene {
     }
   }
 
-  // ─── CLEANUP ──────────────────────────────────────────────────────
-
   private cleanup() {
+    const username = this.username;
+
+    if (this.socket) {
+      this.socket.close();
+      this.socket = undefined;
+    }
+
+    if (username) {
+      void leaveLobby(username).catch(() => undefined);
+    }
+
     if (this.hudEl) {
       this.hudEl.remove();
       this.hudEl = undefined;
     }
+
+    if (this.statusEl) {
+      this.statusEl.remove();
+      this.statusEl = undefined;
+    }
+
     if (this.resizeHandler) {
       window.removeEventListener("resize", this.resizeHandler);
       this.resizeHandler = undefined;
     }
-    // Stop the RoleScene overlay when BoardGameScene shuts down
+
     if (this.scene.isActive("RoleScene")) {
       this.scene.stop("RoleScene");
     }
-    // Stop the VotingScene overlay when BoardGameScene shuts down
+
     if (this.scene.isActive("VotingScene")) {
       this.scene.stop("VotingScene");
     }
-    // Stop the NominationScene overlay when BoardGameScene shuts down
+
     if (this.scene.isActive("NominationScene")) {
       this.scene.stop("NominationScene");
     }
