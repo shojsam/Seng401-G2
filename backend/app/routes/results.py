@@ -1,18 +1,20 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from fastapi import APIRouter
 
-from app.data.database import get_db
-from app.data.models import GameResult
+from ..data.models import get_recent_results
 
 router = APIRouter()
 
 
 @router.get("/")
-async def get_results(db: Session = Depends(get_db)):
-    results = db.query(GameResult).order_by(GameResult.played_at.desc()).all()
+async def get_results():
+    results = get_recent_results()
     return {
         "results": [
-            {"id": r.id, "winner": r.winner, "played_at": str(r.played_at)}
+            {
+                "id": r.get("id"),
+                "winner": r.get("winner"),
+                "played_at": str(r.get("played_at")),
+            }
             for r in results
         ]
     }

@@ -2,13 +2,11 @@ import asyncio
 import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from sqlalchemy.orm import Session
 
-from app.logic.game_engine import GameState, Phase
-from app.logic.voting import Vote
-from app.routes.lobby import lobby_players
-from app.data.database import SessionLocal
-from app.data.models import GameResult
+from ..logic.game_engine import GameState, Phase
+from ..logic.voting import Vote
+from ..routes.lobby import lobby_players
+from ..data.models import save_game_result
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -68,16 +66,10 @@ async def broadcast_lobby_state():
 
 def save_game_outcome(winner: str):
     """Persist the game result to MySQL."""
-    db: Session = SessionLocal()
     try:
-        result = GameResult(winner=winner)
-        db.add(result)
-        db.commit()
+        save_game_result(winner)
     except Exception:
-        db.rollback()
         logger.exception("Failed to save game outcome")
-    finally:
-        db.close()
 
 
 
