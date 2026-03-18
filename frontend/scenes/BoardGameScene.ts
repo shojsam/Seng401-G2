@@ -6,12 +6,14 @@ import Phaser from "phaser";
  *   board_bg.png          → UN courtroom background
  *   card_sustainable.png  → Blue "SUSTAINABLE" card holder (transparent bg)
  *   card_exploitative.png → Red "EXPLOITATIVE" card holder (transparent bg)
+ *   player_basecard.png   → Player card background used in the HUD
  */
 
 const ASSETS = {
   board_bg: "assets/board_bg.png",
   card_sustainable: "assets/card_sustainable.png",
   card_exploitative: "assets/card_exploitative.png",
+  player_basecard: "assets/player_basecard.png",
 };
 
 const HUD_HEIGHT = 250;
@@ -49,6 +51,7 @@ export class BoardGameScene extends Phaser.Scene {
     this.load.image("board_bg", ASSETS.board_bg);
     this.load.image("card_sustainable", ASSETS.card_sustainable);
     this.load.image("card_exploitative", ASSETS.card_exploitative);
+    this.load.image("player_basecard", ASSETS.player_basecard);
   }
 
   // ─── CREATE ───────────────────────────────────────────────────────
@@ -80,6 +83,32 @@ export class BoardGameScene extends Phaser.Scene {
 
     this.events.on("shutdown", this.cleanup, this);
     this.events.on("destroy", this.cleanup, this);
+
+    // ── Launch the RoleScene overlay in parallel ──────────────────
+    if (!this.scene.isActive("RoleScene")) {
+      this.scene.launch("RoleScene", { role: "reformer" });
+    }
+
+    // ── Launch the VotingScene overlay in parallel ────────────────
+    if (!this.scene.isActive("VotingScene")) {
+      this.scene.launch("VotingScene", {
+        nominatorName: "Player 1",
+        nomineeName: "Player 2",
+      });
+    }
+
+    // ── Launch the NominationScene overlay in parallel ────────────
+    if (!this.scene.isActive("NominationScene")) {
+      this.scene.launch("NominationScene", {
+        players: [
+          { name: "Player 2", eligible: true },
+          { name: "Player 3", eligible: true },
+          { name: "Player 4", eligible: false },
+          { name: "Player 5", eligible: true },
+          { name: "Player 6", eligible: true },
+        ],
+      });
+    }
   }
 
   // ─── LAYOUT (canvas-based content) ────────────────────────────────
@@ -113,7 +142,7 @@ export class BoardGameScene extends Phaser.Scene {
     bg.setDepth(0);
 
     // Dim overlay
-    const dimOverlay = this.add.rectangle(width / 2, TOTAL_HUD + bgDisplayH / 2, width, bgDisplayH, 0x000000, 0.5);
+    const dimOverlay = this.add.rectangle(width / 2, TOTAL_HUD + bgDisplayH / 2, width, bgDisplayH, 0x353b42, 0.8);
     dimOverlay.setDepth(1);
 
     // Fill area above background (behind HUD) with solid color
@@ -139,7 +168,7 @@ export class BoardGameScene extends Phaser.Scene {
     const rightCenterX = width * 0.75;
     const targetW = width * 0.38;
 
-    // ── Sustainable (blue) — LEFT ─────────────────────────────────
+    // ── Sustainable (green) — LEFT ─────────────────────────────────
     this.sustainableHolder = this.add.image(leftCenterX, holderY, "card_sustainable");
     const susTexW = this.sustainableHolder.texture.getSourceImage().width;
     this.sustainableHolder.setScale(targetW / susTexW);
@@ -151,8 +180,6 @@ export class BoardGameScene extends Phaser.Scene {
     this.exploitativeHolder.setScale(targetW / expTexW);
     this.exploitativeHolder.setDepth(5);
   }
-
-  // ─── HUD (fixed DOM overlay — stays at top while scrolling) ───────
 
   private createHUD() {
     const existing = document.getElementById("board-hud");
@@ -168,7 +195,7 @@ export class BoardGameScene extends Phaser.Scene {
       left: "0",
       width: "100%",
       height: `${HUD_HEIGHT}px`,
-      background: "#0d1b2a",
+      background: "#353b42",
       zIndex: "100",
       display: "flex",
       alignItems: "center",
@@ -182,34 +209,37 @@ export class BoardGameScene extends Phaser.Scene {
     this.players.forEach((player, i) => {
       const card = document.createElement("div");
       Object.assign(card.style, {
-        width: "100px",
-        height: "150px",
-        background: "rgba(26, 40, 64, 0.85)",
-        border: `2px solid ${player.isActive ? "#d4a843" : "#5a7a9a"}`,
+        width: "150px",
+        height: "225px",
+        backgroundImage: `url("${ASSETS.player_basecard}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        border: "none",
         borderRadius: "8px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "center",
+        justifyContent: "flex-end",
+        paddingBottom: "15px",
         boxSizing: "border-box",
+        overflow: "hidden",
       });
 
       const name = document.createElement("div");
       name.textContent = player.name;
       Object.assign(name.style, {
-        fontSize: "14px",
-        fontWeight: "bold",
-        color: player.isEliminated ? "#666666" : "#e8e4dc",
+        fontSize: "30px",
+        color: player.isEliminated ? "#666666" : "#514b3f",
         textDecoration: player.isEliminated ? "line-through" : "none",
       });
 
       const role = document.createElement("div");
       role.textContent = player.role ?? "?";
       Object.assign(role.style, {
-        fontSize: "11px",
-        fontWeight: "bold",
-        color: "#a0986c",
-        marginTop: "2px",
+        fontSize: "26px",
+        color: "#514b3f",
+        marginTop: "5px",
       });
 
       card.appendChild(name);
@@ -267,6 +297,18 @@ export class BoardGameScene extends Phaser.Scene {
     if (this.resizeHandler) {
       window.removeEventListener("resize", this.resizeHandler);
       this.resizeHandler = undefined;
+    }
+    // Stop the RoleScene overlay when BoardGameScene shuts down
+    if (this.scene.isActive("RoleScene")) {
+      this.scene.stop("RoleScene");
+    }
+    // Stop the VotingScene overlay when BoardGameScene shuts down
+    if (this.scene.isActive("VotingScene")) {
+      this.scene.stop("VotingScene");
+    }
+    // Stop the NominationScene overlay when BoardGameScene shuts down
+    if (this.scene.isActive("NominationScene")) {
+      this.scene.stop("NominationScene");
     }
   }
 }

@@ -269,7 +269,7 @@ export class MenuScene extends Phaser.Scene {
   private buildPanel(title: string, borderColor: string, lineColor: string): HTMLDivElement {
     const panel = document.createElement("div");
     Object.assign(panel.style, {
-      background: "rgba(12, 28, 40, 0.92)",
+      background: "rgba(44, 50, 54, 0.92)",
       border: `4px solid ${borderColor}`,
       borderRadius: "18px",
       padding: "26px 26px 28px",

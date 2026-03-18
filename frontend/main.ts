@@ -1,6 +1,9 @@
 import Phaser from "phaser";
 import { MenuScene } from "./scenes/MenuScene";
 import { BoardGameScene } from "./scenes/BoardGameScene";
+import { RoleScene } from "./scenes/RoleScene";
+import { VotingScene } from "./scenes/VotingScene";
+import { NominationScene } from "./scenes/NominationScene";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -17,7 +20,7 @@ const config: Phaser.Types.Core.GameConfig = {
         },
     },
     backgroundColor: "#0d1b2a",
-  scene: [MenuScene, BoardGameScene],
+  scene: [MenuScene, BoardGameScene, RoleScene, VotingScene, NominationScene],
 };
 
 new Phaser.Game(config);
