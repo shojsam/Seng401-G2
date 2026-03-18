@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .data.database import get_connection
+from .data.seed import initialize_and_seed_database
 from .routes import lobby, results
 from .ws import game
 from .data import repository
@@ -30,9 +31,9 @@ def on_startup():
     try:
         conn = get_connection()
         conn.close()
+        initialize_and_seed_database()
     except Exception as exc:
-        # Allow the service to boot even if the database is not reachable yet.
-        print(f"Database connection unavailable at startup: {exc}")
+        print(f"Database initialization unavailable at startup: {exc}")
 
 
 @app.get("/health")
