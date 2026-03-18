@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { joinLobby } from "../src/api";
+import { createLobby, joinLobby } from "../src/api";
 
 /**
  * Asset paths — adjust these to match your project's asset directory.
@@ -162,9 +162,12 @@ export class MenuScene extends Phaser.Scene {
       joinMessage.textContent = `Joining ${lobby} as ${username}...`;
 
       try {
-        await joinLobby(username);
+        const result = await joinLobby(username, lobby);
         this.cleanup();
-        this.scene.start("BoardGameScene", { username, lobbyCode: lobby });
+        this.scene.start("BoardGameScene", {
+          username: result.username,
+          lobbyCode: result.lobby_code,
+        });
       } catch (error) {
         joinMessage.style.color = "#ffd3c8";
         joinMessage.textContent =
@@ -223,9 +226,12 @@ export class MenuScene extends Phaser.Scene {
       createMessage.textContent = `Creating a new session for ${username}...`;
 
       try {
-        await joinLobby(username);
+        const result = await createLobby(username);
         this.cleanup();
-        this.scene.start("BoardGameScene", { username, lobbyCode: "MAIN" });
+        this.scene.start("BoardGameScene", {
+          username: result.username,
+          lobbyCode: result.lobby_code,
+        });
       } catch (error) {
         createMessage.style.color = "#ffd3c8";
         createMessage.textContent =

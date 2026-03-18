@@ -57,7 +57,7 @@ export class BoardGameScene extends Phaser.Scene {
   create() {
     const data = (this.scene.settings.data as BoardSceneData | undefined) ?? {};
     this.username = (data.username ?? "").trim();
-    this.lobbyCode = (data.lobbyCode ?? "MAIN").trim() || "MAIN";
+    this.lobbyCode = (data.lobbyCode ?? "").trim().toUpperCase();
 
     document.body.style.overflowX = "hidden";
     document.body.style.overflowY = "auto";
@@ -272,7 +272,7 @@ export class BoardGameScene extends Phaser.Scene {
 
   private async syncLobbyState() {
     try {
-      const data = await getLobbyPlayers();
+      const data = await getLobbyPlayers(this.lobbyCode);
       this.updatePlayers(data.players.map((name) => ({ name })));
       this.setStatus(`Lobby synced (${data.players.length} players)`);
     } catch (error) {
@@ -289,7 +289,7 @@ export class BoardGameScene extends Phaser.Scene {
     }
 
     this.socket?.close();
-    const socket = createGameSocket(this.username);
+    const socket = createGameSocket(this.lobbyCode, this.username);
     this.socket = socket;
 
     socket.addEventListener("open", () => {
@@ -378,7 +378,7 @@ export class BoardGameScene extends Phaser.Scene {
     }
 
     if (username) {
-      void leaveLobby(username).catch(() => undefined);
+      void leaveLobby(username, this.lobbyCode).catch(() => undefined);
     }
 
     if (this.hudEl) {
