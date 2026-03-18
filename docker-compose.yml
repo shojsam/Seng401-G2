@@ -2,6 +2,8 @@ services:
   db:
     image: mysql:8.4
     container_name: greenwatch-db
+    profiles:
+      - local-db
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: card_game_db
@@ -19,15 +21,12 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: greenwatch-backend
-    depends_on:
-      db:
-        condition: service_healthy
     environment:
-      MYSQLHOST: db
-      MYSQLPORT: 3306
-      MYSQLUSER: root
-      MYSQLPASSWORD: root
-      MYSQLDATABASE: card_game_db
+      MYSQLHOST: ${MYSQLHOST}
+      MYSQLPORT: ${MYSQLPORT}
+      MYSQLUSER: ${MYSQLUSER}
+      MYSQLPASSWORD: ${MYSQLPASSWORD}
+      MYSQLDATABASE: ${MYSQLDATABASE}
     ports:
       - "8000:8000"
 
