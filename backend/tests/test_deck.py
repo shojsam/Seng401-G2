@@ -3,7 +3,7 @@ from app.logic.deck import PolicyType, PolicyCard, POLICY_CARDS, deal_hands
 
 def test_deal_hands_reformers_get_sustainable():
     if not POLICY_CARDS:
-        return  # skip until cards are added
+        return  
     roles = {"p1": "reformer", "p2": "reformer", "p3": "exploiter"}
     hands = deal_hands(roles, cards_per_player=2)
     for card in hands["p1"]:
@@ -14,7 +14,7 @@ def test_deal_hands_reformers_get_sustainable():
 
 def test_deal_hands_exploiters_get_exploitative():
     if not POLICY_CARDS:
-        return  # skip until cards are added
+        return  
     roles = {"p1": "reformer", "p2": "exploiter"}
     hands = deal_hands(roles, cards_per_player=2)
     for card in hands["p2"]:
@@ -23,7 +23,7 @@ def test_deal_hands_exploiters_get_exploitative():
 
 def test_deal_hands_correct_count():
     if not POLICY_CARDS:
-        return  # skip until cards are added
+        return 
     roles = {"p1": "reformer", "p2": "exploiter"}
     hands = deal_hands(roles, cards_per_player=3)
     for hand in hands.values():
@@ -62,7 +62,6 @@ def test_deal_hands_pool_exhaustion():
     if not POLICY_CARDS:
         return
 
-    # Force more cards than exist
     roles = {"p1": "reformer"}
     hands = deal_hands(roles, cards_per_player=100)
 

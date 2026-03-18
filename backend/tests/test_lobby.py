@@ -2,7 +2,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.routes.lobby import router, lobby_players  # adjust import!
+from app.routes.lobby import router, lobby_players 
 
 app = FastAPI()
 app.include_router(router)
@@ -12,7 +12,6 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def clear_lobby():
-    # Ensure clean state before each test
     lobby_players.clear()
     yield
     lobby_players.clear()
@@ -45,7 +44,6 @@ def test_leave_lobby():
     assert response.status_code == 200
     assert "left the lobby" in response.json()["message"]
 
-    # Ensure user is gone
     players = client.get("/players").json()["players"]
     assert "Alice" not in players
 

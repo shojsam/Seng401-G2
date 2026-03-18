@@ -8,20 +8,16 @@ class TestDatabase(unittest.TestCase):
     @patch('app.data.database.get_connection')
     def test_execute_query_fetch_success(self, mock_get_conn):
         """Test execute_query returns data when fetch=True"""
-        # Setup mocks
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_get_conn.return_value = mock_conn
         mock_conn.cursor.return_value = mock_cursor
         
-        # Simulated database data
         expected_data = [{'id': 1, 'name': 'Ace of Spades'}]
         mock_cursor.fetchall.return_value = expected_data
         
-        # Execute
         result = db_manager.execute_query("SELECT * FROM cards", fetch=True)
         
-        # Assertions
         mock_cursor.execute.assert_called_once_with("SELECT * FROM cards", ())
         self.assertEqual(result, expected_data)
         mock_cursor.close.assert_called_once()

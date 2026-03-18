@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
-# Replace 'your_script' with the actual filename
+
 from app.data.seed import seed_database
 
 class TestDatabaseSeeding(unittest.TestCase):
@@ -8,31 +8,25 @@ class TestDatabaseSeeding(unittest.TestCase):
     @patch('app.data.seed.get_connection')
     def test_seed_database_success(self, mock_get_conn):
         """Test that seed_database calls executemany for both cards and users."""
-        # Setup mocks
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
         mock_get_conn.return_value = mock_conn
         mock_conn.cursor.return_value = mock_cursor
 
-        # Run the function
         seed_database()
 
-        # 1. Check if executemany was called twice (once for cards, once for users)
         self.assertEqual(mock_cursor.executemany.call_count, 2)
 
-        # 2. Verify the Card Data call
         card_query = "INSERT INTO cards (card_name, card_type, card_detail) VALUES (%s, %s, %s)"
         first_call_args = mock_cursor.executemany.call_args_list[0]
         self.assertEqual(first_call_args[0][0], card_query)
-        self.assertEqual(len(first_call_args[0][1]), 4)  # 4 cards in your list
+        self.assertEqual(len(first_call_args[0][1]), 4) 
 
-        # 3. Verify the User Data call
         user_query = "INSERT INTO users (username, password, total_games_played, total_wins, total_losses) VALUES (%s, %s, %s, %s, %s)"
         second_call_args = mock_cursor.executemany.call_args_list[1]
         self.assertEqual(second_call_args[0][0], user_query)
-        self.assertEqual(len(second_call_args[0][1]), 3)  # 3 users in your list
+        self.assertEqual(len(second_call_args[0][1]), 3) 
 
-        # 4. Final safety checks
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
 
@@ -44,14 +38,11 @@ class TestDatabaseSeeding(unittest.TestCase):
         mock_get_conn.return_value = mock_conn
         mock_conn.cursor.return_value = mock_cursor
         
-        # Simulate an error on the second insert
         mock_cursor.executemany.side_effect = [None, Exception("User table full")]
 
         seed_database()
 
-        # Verify rollback was called
         mock_conn.rollback.assert_called_once()
-        # Verify connection was still closed
         mock_conn.close.assert_called_once()
 
 if __name__ == '__main__':
