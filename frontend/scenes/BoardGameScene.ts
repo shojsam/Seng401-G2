@@ -3,9 +3,8 @@ import { createGameSocket, getLobbyPlayers, leaveLobby } from "../src/api";
 
 const ASSETS = {
   board_bg: "assets/board_bg.png",
-  card_sustainable: "assets/card_sustainable.png",
-  card_exploitative: "assets/card_exploitative.png",
   player_basecard: "assets/player_basecard.png",
+  policy_folder: "assets/policy_folder1.png",
 };
 
 const HUD_HEIGHT = 250;
@@ -33,14 +32,15 @@ export class BoardGameScene extends Phaser.Scene {
   private players: PlayerData[] = [];
   private hudEl?: HTMLDivElement;
   private statusEl?: HTMLDivElement;
-  private sustainableHolder!: Phaser.GameObjects.Image;
-  private exploitativeHolder!: Phaser.GameObjects.Image;
+  private holdersEl?: HTMLDivElement;
+  private drawPileEl?: HTMLDivElement;
   private username = "";
   private lobbyCode = "MAIN";
   private socket?: WebSocket;
 
   private sustainableCount = 0;
   private exploitativeCount = 0;
+  private policyDrawCount = 20;
   private resizeHandler?: () => void;
 
   constructor() {
@@ -49,8 +49,6 @@ export class BoardGameScene extends Phaser.Scene {
 
   preload() {
     this.load.image("board_bg", ASSETS.board_bg);
-    this.load.image("card_sustainable", ASSETS.card_sustainable);
-    this.load.image("card_exploitative", ASSETS.card_exploitative);
     this.load.image("player_basecard", ASSETS.player_basecard);
   }
 
@@ -68,9 +66,14 @@ export class BoardGameScene extends Phaser.Scene {
 
     this.layoutScene();
     this.createHUD();
-    this.createStatusPanel();
+    this.createPolicyHolders();
+    this.createDrawPile();
 
-    this.resizeHandler = () => this.layoutScene();
+    this.resizeHandler = () => {
+      this.layoutScene();
+      this.createPolicyHolders();
+      this.createDrawPile();
+    };
     window.addEventListener("resize", this.resizeHandler);
 
     this.events.on("shutdown", this.cleanup, this);
@@ -141,29 +144,279 @@ export class BoardGameScene extends Phaser.Scene {
     const hudBgFill = this.add.rectangle(width / 2, TOTAL_HUD / 2, width, TOTAL_HUD, 0x0d1b2a, 1);
     (hudBgFill as { name?: string }).name = "hud_bg_fill";
     hudBgFill.setDepth(0);
-
-    this.layoutCardHolders(width, bgDisplayH);
   }
 
-  private layoutCardHolders(width: number, bgDisplayH: number) {
-    if (this.sustainableHolder) this.sustainableHolder.destroy();
-    if (this.exploitativeHolder) this.exploitativeHolder.destroy();
+  // ─── DOM-BASED POLICY HOLDERS ─────────────────────────────────────
 
-    const holderY = TOTAL_HUD + bgDisplayH * 0.25;
-    const leftCenterX = width * 0.25;
-    const rightCenterX = width * 0.75;
-    const targetW = width * 0.38;
+  private createPolicyHolders() {
+    const existing = document.getElementById("policy-holders");
+    if (existing) existing.remove();
 
-    this.sustainableHolder = this.add.image(leftCenterX, holderY, "card_sustainable");
-    const susTexW = this.sustainableHolder.texture.getSourceImage().width;
-    this.sustainableHolder.setScale(targetW / susTexW);
-    this.sustainableHolder.setDepth(5);
+    const parent = document.getElementById("game-container") ?? document.body;
+    const width = window.innerWidth;
+    const bgTex = this.textures.get("board_bg").getSourceImage();
+    const bgAspect = bgTex.height / bgTex.width;
+    const bgDisplayH = width * bgAspect;
 
-    this.exploitativeHolder = this.add.image(rightCenterX, holderY, "card_exploitative");
-    const expTexW = this.exploitativeHolder.texture.getSourceImage().width;
-    this.exploitativeHolder.setScale(targetW / expTexW);
-    this.exploitativeHolder.setDepth(5);
+    const holderW = Math.min(width * 0.42, 750);
+    const holderH = holderW * 0.65;
+    const holderY = TOTAL_HUD + bgDisplayH * 0.35 - holderH / 2;
+
+    const container = document.createElement("div");
+    container.id = "policy-holders";
+    Object.assign(container.style, {
+      position: "absolute",
+      top: `${holderY}px`,
+      left: "0",
+      width: "100%",
+      display: "flex",
+      justifyContent: "center",
+      gap: `${width * 0.06}px`,
+      zIndex: "10",
+      pointerEvents: "none",
+      fontFamily: '"Jersey 20", sans-serif',
+    });
+
+    container.appendChild(
+      this.buildHolder(
+        holderW,
+        holderH,
+        "#1a5c32",
+        "#2b9d65",
+        "SUSTAINABLE",
+        "REFORMERS MUST PASS 5\nSUSTAINABLE POLICIES TO WIN",
+        this.sustainableCount,
+        5
+      )
+    );
+
+    container.appendChild(
+      this.buildHolder(
+        holderW,
+        holderH,
+        "#6b1a1a",
+        "#c0392b",
+        "EXPLOITATIVE",
+        "EXPLOITERS MUST PASS 3\nEXPLOITATIVE POLICIES TO WIN",
+        this.exploitativeCount,
+        3
+      )
+    );
+
+    parent.appendChild(container);
+    this.holdersEl = container;
   }
+
+  private buildHolder(
+    w: number,
+    h: number,
+    bgColor: string,
+    borderColor: string,
+    titleText: string,
+    descText: string,
+    filled: number,
+    total: number
+  ): HTMLDivElement {
+    const holder = document.createElement("div");
+    Object.assign(holder.style, {
+      width: `${w}px`,
+      height: `${h}px`,
+      background: bgColor,
+      border: `4px solid ${borderColor}`,
+      borderRadius: "4px",
+      boxShadow: "4px 4px 0 rgba(0,0,0,0.5)",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "space-between",
+      boxSizing: "border-box",
+      padding: "16px",
+    });
+
+    const title = document.createElement("div");
+    title.textContent = titleText;
+    Object.assign(title.style, {
+      fontSize: `${Math.max(32, Math.floor(w * 0.08))}px`,
+      color: "#f0ebe3",
+      letterSpacing: "3px",
+      textAlign: "center",
+    });
+    holder.appendChild(title);
+
+    // ── Policy card slots (56×74 aspect ratio) ──────────────────────
+    const slotsRow = document.createElement("div");
+    Object.assign(slotsRow.style, {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "10px",
+    });
+
+    const scale = 2.25;
+    const slotW = Math.floor(56 * scale);
+    const slotH = Math.floor(74 * scale);
+
+    for (let i = 0; i < total; i++) {
+      const slot = document.createElement("div");
+      Object.assign(slot.style, {
+        width: `${slotW}px`,
+        height: `${slotH}px`,
+        background: "rgba(0, 0, 0, 0.25)",
+        border: `2px solid ${borderColor}`,
+        borderRadius: "4px",
+        boxSizing: "border-box",
+      });
+      slotsRow.appendChild(slot);
+    }
+
+    holder.appendChild(slotsRow);
+
+    const desc = document.createElement("div");
+    desc.textContent = descText;
+    Object.assign(desc.style, {
+      fontSize: `${Math.max(18, Math.floor(w * 0.045))}px`,
+      color: "#d4cfc5",
+      textAlign: "center",
+      lineHeight: "1.3",
+      whiteSpace: "pre-line",
+    });
+    holder.appendChild(desc);
+
+    return holder;
+  }
+
+  // ─── DRAW PILE ────────────────────────────────────────────────────
+
+  private createDrawPile() {
+    const existing = document.getElementById("draw-pile");
+    if (existing) existing.remove();
+
+    const parent = document.getElementById("game-container") ?? document.body;
+    const width = window.innerWidth;
+    const bgTex = this.textures.get("board_bg").getSourceImage();
+    const bgAspect = bgTex.height / bgTex.width;
+    const bgDisplayH = width * bgAspect;
+
+    const holderW = Math.min(width * 0.42, 750);
+    const holderH = holderW * 0.65;
+    const holderY = TOTAL_HUD + bgDisplayH * 0.35 - holderH / 2;
+
+    // Position below the sustainable holder (left side)
+    const pileTop = holderY + holderH + 70;
+    const pileCenterX = width * 0.25;
+
+    const pile = this.buildDrawPile(this.policyDrawCount);
+    pile.id = "draw-pile";
+    Object.assign(pile.style, {
+      position: "absolute",
+      top: `${pileTop}px`,
+      left: `${pileCenterX}px`,
+      transform: "translateX(-50%)",
+      zIndex: "10",
+      pointerEvents: "none",
+    });
+
+    parent.appendChild(pile);
+    this.drawPileEl = pile;
+  }
+
+  private buildDrawPile(count: number): HTMLDivElement {
+    const scale = 2.25;
+    const cardW = Math.floor(56 * scale);
+    const cardH = Math.floor(74 * scale);
+    const stackOffset = 4.5; // px per card in the stack — increase for wider gaps
+    const maxVisibleCards = Math.min(count, 16);
+
+    const wrapper = document.createElement("div");
+    Object.assign(wrapper.style, {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      fontFamily: '"Jersey 20", sans-serif',
+    });
+
+    // ── Table surface ───────────────────────────────────────────────
+    const tableW = cardW + 60;
+    const labelH = 46;
+    const labelGap = 12;
+    const topPad = 16;
+    const bottomPad = 14;
+    const tableH = topPad + cardH + labelGap + labelH + bottomPad;
+
+    const table = document.createElement("div");
+    Object.assign(table.style, {
+      width: `${tableW}px`,
+      height: `${tableH}px`,
+      background: "linear-gradient(to bottom, #5c3d2e, #4a3122)",
+      border: "4px solid #3a2518",
+      boxShadow: "4px 4px 0 rgba(0,0,0,0.5)",
+      boxSizing: "border-box",
+      position: "relative",
+    });
+
+    // ── Stacked cards ───────────────────────────────────────────────
+    const stackH = maxVisibleCards * stackOffset;
+    const stackContainer = document.createElement("div");
+    Object.assign(stackContainer.style, {
+      position: "absolute",
+      left: "50%",
+      transform: "translateX(-50%)",
+      bottom: `${bottomPad + labelH + labelGap}px`,
+      width: `${cardW}px`,
+      height: `${cardH + stackH}px`,
+    });
+
+    for (let i = 0; i < maxVisibleCards; i++) {
+      const card = document.createElement("div");
+      const offsetY = i * stackOffset;
+      Object.assign(card.style, {
+        position: "absolute",
+        bottom: `${offsetY}px`,
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: `${cardW}px`,
+        height: `${cardH}px`,
+        backgroundImage: `url("${ASSETS.policy_folder}")`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        imageRendering: "pixelated",
+        borderRadius: "4px",
+        boxSizing: "border-box",
+      });
+
+      stackContainer.appendChild(card);
+    }
+
+    table.appendChild(stackContainer);
+
+    // ── Count label ─────────────────────────────────────────────────
+    const label = document.createElement("div");
+    label.textContent = `${count}`;
+    Object.assign(label.style, {
+      position: "absolute",
+      bottom: `${bottomPad}px`,
+      left: "50%",
+      transform: "translateX(-50%)",
+      fontSize: "32px",
+      color: "#f0ebe3",
+      textAlign: "center",
+      letterSpacing: "1px",
+      background: "#3a2518",
+      borderRadius: "4px",
+      padding: "2px 16px",
+      minWidth: "40px",
+      height: `${labelH}px`,
+      lineHeight: `${labelH}px`,
+      boxSizing: "border-box",
+    });
+    table.appendChild(label);
+
+    wrapper.appendChild(table);
+    return wrapper;
+  }
+
+  // ─── HUD ──────────────────────────────────────────────────────────
 
   private createHUD() {
     const existing = document.getElementById("board-hud");
@@ -192,6 +445,7 @@ export class BoardGameScene extends Phaser.Scene {
       padding: "12px",
     });
 
+    // ── Player cards ────────────────────────────────────────────────
     this.players.forEach((player) => {
       const card = document.createElement("div");
       Object.assign(card.style, {
@@ -233,58 +487,55 @@ export class BoardGameScene extends Phaser.Scene {
       hud.appendChild(card);
     });
 
+    // ── Status info (top-right of HUD) ──────────────────────────────
+    const statusInfo = document.createElement("div");
+    statusInfo.id = "board-status";
+    Object.assign(statusInfo.style, {
+      position: "absolute",
+      top: "10px",
+      right: "14px",
+      fontFamily: '"Jersey 20", sans-serif',
+      fontSize: "20px",
+      color: "#9e9a92",
+      textAlign: "right",
+      lineHeight: "1.4",
+      pointerEvents: "none",
+    });
+    hud.appendChild(statusInfo);
+    this.statusEl = statusInfo;
+    this.setStatus("Connecting...");
+
     parent.appendChild(hud);
     this.hudEl = hud;
   }
 
-  private createStatusPanel() {
-    const existing = document.getElementById("board-status");
-    if (existing) existing.remove();
-
-    const parent = document.getElementById("game-container") ?? document.body;
-    const status = document.createElement("div");
-    status.id = "board-status";
-    Object.assign(status.style, {
-      position: "absolute",
-      top: `${TOTAL_HUD + 12}px`,
-      right: "12px",
-      zIndex: "110",
-      padding: "12px 16px",
-      background: "rgba(13, 27, 42, 0.9)",
-      color: "#f4efe7",
-      border: "2px solid #d4a843",
-      borderRadius: "12px",
-      fontFamily: '"Jersey 20", sans-serif',
-      fontSize: "24px",
-      lineHeight: "1.2",
-      minWidth: "220px",
-      boxShadow: "0 8px 20px rgba(0,0,0,0.35)",
-    });
-    parent.appendChild(status);
-    this.statusEl = status;
-    this.setStatus("Connecting to backend...");
-  }
-
   private setStatus(message: string) {
     if (!this.statusEl) return;
-    this.statusEl.innerHTML = `Player: ${this.username || "Unknown"}<br/>Lobby: ${this.lobbyCode}<br/>${message}`;
+    this.statusEl.innerHTML =
+      `<span style="color:#e8e4dc">${this.username || "?"}</span>` +
+      ` · ` +
+      `<span style="color:#d4a843">${this.lobbyCode}</span>` +
+      ` · ` +
+      `${message}`;
   }
+
+  // ─── NETWORKING ───────────────────────────────────────────────────
 
   private async syncLobbyState() {
     try {
       const data = await getLobbyPlayers(this.lobbyCode);
       this.updatePlayers(data.players.map((name) => ({ name })));
-      this.setStatus(`Lobby synced (${data.players.length} players)`);
+      this.setStatus(`${data.players.length} players`);
     } catch (error) {
       this.setStatus(
-        error instanceof Error ? `Lobby sync failed: ${error.message}` : "Lobby sync failed"
+        error instanceof Error ? `Sync failed: ${error.message}` : "Sync failed"
       );
     }
   }
 
   private connectWebSocket() {
     if (!this.username) {
-      this.setStatus("Missing player name");
+      this.setStatus("Missing name");
       return;
     }
 
@@ -293,7 +544,7 @@ export class BoardGameScene extends Phaser.Scene {
     this.socket = socket;
 
     socket.addEventListener("open", () => {
-      this.setStatus("WebSocket connected");
+      this.setStatus("Connected");
     });
 
     socket.addEventListener("message", (event) => {
@@ -305,35 +556,37 @@ export class BoardGameScene extends Phaser.Scene {
             ? (message.data.players as string[])
             : [];
           this.updatePlayers(players.map((name) => ({ name })));
-          this.setStatus(`Live lobby update (${players.length} players)`);
+          this.setStatus(`${players.length} players`);
           return;
         }
 
         if (message.type === "player_disconnected") {
           const disconnectedUser = String(message.data?.username ?? "A player");
-          this.setStatus(`${disconnectedUser} disconnected`);
+          this.setStatus(`${disconnectedUser} left`);
           return;
         }
 
         if (message.type === "error") {
-          const backendMessage = String(message.data?.message ?? "Unknown backend error");
-          this.setStatus(`Backend error: ${backendMessage}`);
+          const backendMessage = String(message.data?.message ?? "Unknown error");
+          this.setStatus(`Error: ${backendMessage}`);
         }
       } catch {
-        this.setStatus("Received invalid socket message");
+        this.setStatus("Bad message");
       }
     });
 
     socket.addEventListener("close", () => {
       if (this.socket === socket) {
-        this.setStatus("WebSocket disconnected");
+        this.setStatus("Disconnected");
       }
     });
 
     socket.addEventListener("error", () => {
-      this.setStatus("WebSocket connection failed");
+      this.setStatus("Connection failed");
     });
   }
+
+  // ─── PUBLIC API ───────────────────────────────────────────────────
 
   public updatePlayers(players: PlayerData[]) {
     this.players = players;
@@ -342,10 +595,12 @@ export class BoardGameScene extends Phaser.Scene {
 
   public addSustainablePolicy() {
     this.sustainableCount = Math.min(this.sustainableCount + 1, 5);
+    this.createPolicyHolders();
   }
 
   public addExploitativePolicy() {
     this.exploitativeCount = Math.min(this.exploitativeCount + 1, 3);
+    this.createPolicyHolders();
   }
 
   public setActivePlayer(index: number) {
@@ -369,6 +624,8 @@ export class BoardGameScene extends Phaser.Scene {
     }
   }
 
+  // ─── CLEANUP ──────────────────────────────────────────────────────
+
   private cleanup() {
     const username = this.username;
 
@@ -386,10 +643,17 @@ export class BoardGameScene extends Phaser.Scene {
       this.hudEl = undefined;
     }
 
-    if (this.statusEl) {
-      this.statusEl.remove();
-      this.statusEl = undefined;
+    if (this.holdersEl) {
+      this.holdersEl.remove();
+      this.holdersEl = undefined;
     }
+
+    if (this.drawPileEl) {
+      this.drawPileEl.remove();
+      this.drawPileEl = undefined;
+    }
+
+    this.statusEl = undefined;
 
     if (this.resizeHandler) {
       window.removeEventListener("resize", this.resizeHandler);
