@@ -181,7 +181,7 @@ export class BoardGameScene extends Phaser.Scene {
 
     const holderW = Math.min(width * 0.42, 750);
     const holderH = holderW * 0.65;
-    const holderY = TOTAL_HUD + bgDisplayH * 0.35 - holderH / 2;
+    const holderY = TOTAL_HUD + bgDisplayH * 0.3 - holderH / 2;
 
     const container = document.createElement("div");
     container.id = "policy-holders";
