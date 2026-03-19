@@ -11,6 +11,14 @@ const HUD_HEIGHT = 250;
 const BORDER_HEIGHT = 5;
 const TOTAL_HUD = HUD_HEIGHT + BORDER_HEIGHT;
 
+/**
+ * Base width used for all DOM element sizing.
+ * This is the reference resolution — DOM elements are built at this width
+ * and then CSS-scaled to match the actual canvas, so browser zoom
+ * never changes their relative proportions.
+ */
+const BASE_WIDTH = 1920;
+
 interface PlayerData {
   name: string;
   role?: string;
@@ -76,6 +84,7 @@ export class BoardGameScene extends Phaser.Scene {
 
     this.resizeHandler = () => {
       this.layoutScene();
+      this.createHUD();
       this.createPolicyHolders();
       this.createDrawPile();
     };
@@ -133,67 +142,130 @@ export class BoardGameScene extends Phaser.Scene {
     this.connectWebSocket();
   }
 
-  private layoutScene() {
-    const width = window.innerWidth;
-    const bgTex = this.textures.get("board_bg").getSourceImage();
-    const bgAspect = bgTex.height / bgTex.width;
-    const bgDisplayH = width * bgAspect;
-    const totalH = Math.max(TOTAL_HUD + bgDisplayH, window.innerHeight);
+  // ─── HELPERS ──────────────────────────────────────────────────────
 
-    this.scale.resize(width, totalH);
-    this.game.canvas.style.width = `${width}px`;
-    this.game.canvas.style.height = `${totalH}px`;
+  /** Returns the CSS scale factor to map BASE_WIDTH onto the actual viewport */
+  private getScale(): number {
+    return window.innerWidth / BASE_WIDTH;
+  }
+
+  /** Background aspect ratio */
+  private getBgAspect(): number {
+    const bgTex = this.textures.get("board_bg").getSourceImage();
+    return bgTex.height / bgTex.width;
+  }
+
+  /** Background display height at BASE_WIDTH */
+  private getBaseBgH(): number {
+    return BASE_WIDTH * this.getBgAspect();
+  }
+
+  /**
+   * Creates a clipping wrapper div that is sized to the actual viewport
+   * but contains a child laid out at BASE_WIDTH and CSS-scaled down.
+   * This prevents the unscaled 1920px element from causing scrollbars.
+   */
+  private createScaledWrapper(id: string, zIndex: string): { wrapper: HTMLDivElement; inner: HTMLDivElement } {
+    const s = this.getScale();
+    const canvasH = this.game.canvas.style.height || `${window.innerHeight}px`;
+
+    const wrapper = document.createElement("div");
+    wrapper.id = id;
+    Object.assign(wrapper.style, {
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: `${window.innerWidth}px`,
+      height: canvasH,
+      overflow: "hidden",
+      zIndex,
+      pointerEvents: "none",
+    });
+
+    const inner = document.createElement("div");
+    Object.assign(inner.style, {
+      position: "absolute",
+      top: "0",
+      left: "0",
+      width: `${BASE_WIDTH}px`,
+      transformOrigin: "top left",
+      transform: `scale(${s})`,
+    });
+
+    wrapper.appendChild(inner);
+    return { wrapper, inner };
+  }
+
+  // ─── LAYOUT (canvas-based content) ────────────────────────────────
+
+  private layoutScene() {
+    const s = this.getScale();
+    const baseBgH = this.getBaseBgH();
+    const totalBaseH = TOTAL_HUD + baseBgH;
+    const totalCssH = Math.max(totalBaseH * s, window.innerHeight);
+
+    // Phaser world is always laid out at BASE_WIDTH
+    this.scale.resize(BASE_WIDTH, totalBaseH);
+
+    // Force canvas to fill viewport width; height scales proportionally
+    const canvas = this.game.canvas;
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${totalCssH}px`;
+
+    // Size the game container to match so scrolling works
+    const container = document.getElementById("game-container");
+    if (container) {
+      container.style.width = `${window.innerWidth}px`;
+      container.style.height = `${totalCssH}px`;
+    }
 
     // Destroy previous objects before recreating
     if (this.bgImage) { this.bgImage.destroy(); this.bgImage = undefined; }
     if (this.dimOverlay) { this.dimOverlay.destroy(); this.dimOverlay = undefined; }
     if (this.hudBgFill) { this.hudBgFill.destroy(); this.hudBgFill = undefined; }
 
-    this.bgImage = this.add.image(width / 2, TOTAL_HUD + bgDisplayH / 2, "board_bg");
-    this.bgImage.setDisplaySize(width, bgDisplayH);
+    this.bgImage = this.add.image(BASE_WIDTH / 2, TOTAL_HUD + baseBgH / 2, "board_bg");
+    this.bgImage.setDisplaySize(BASE_WIDTH, baseBgH);
     this.bgImage.setDepth(0);
 
     this.dimOverlay = this.add.rectangle(
-      width / 2,
-      TOTAL_HUD + bgDisplayH / 2,
-      width,
-      bgDisplayH,
+      BASE_WIDTH / 2,
+      TOTAL_HUD + baseBgH / 2,
+      BASE_WIDTH,
+      baseBgH,
       0x353b42,
       0.8
     );
     this.dimOverlay.setDepth(1);
 
-    this.hudBgFill = this.add.rectangle(width / 2, TOTAL_HUD / 2, width, TOTAL_HUD, 0x0d1b2a, 1);
+    this.hudBgFill = this.add.rectangle(BASE_WIDTH / 2, TOTAL_HUD / 2, BASE_WIDTH, TOTAL_HUD, 0x0d1b2a, 1);
     this.hudBgFill.setDepth(0);
   }
 
   // ─── DOM-BASED POLICY HOLDERS ─────────────────────────────────────
 
   private createPolicyHolders() {
-    const existing = document.getElementById("policy-holders");
+    const existing = document.getElementById("policy-holders-wrapper");
     if (existing) existing.remove();
 
     const parent = document.getElementById("game-container") ?? document.body;
-    const width = window.innerWidth;
-    const bgTex = this.textures.get("board_bg").getSourceImage();
-    const bgAspect = bgTex.height / bgTex.width;
-    const bgDisplayH = width * bgAspect;
+    const s = this.getScale();
+    const baseBgH = this.getBaseBgH();
 
-    const holderW = Math.min(width * 0.42, 750);
+    const holderW = BASE_WIDTH * 0.42;
     const holderH = holderW * 0.65;
-    const holderY = TOTAL_HUD + bgDisplayH * 0.3 - holderH / 2;
+    const holderY = TOTAL_HUD + baseBgH * 0.3 - holderH / 2;
+
+    const { wrapper, inner } = this.createScaledWrapper("policy-holders-wrapper", "10");
 
     const container = document.createElement("div");
     container.id = "policy-holders";
     Object.assign(container.style, {
-      position: "absolute",
-      top: `${holderY}px`,
-      left: "0",
-      width: "100%",
+      width: `${BASE_WIDTH}px`,
       display: "flex",
       justifyContent: "center",
-      gap: `${width * 0.06}px`,
-      zIndex: "10",
+      gap: `${BASE_WIDTH * 0.06}px`,
+      paddingTop: `${holderY}px`,
       pointerEvents: "none",
       fontFamily: '"Jersey 20", sans-serif',
     });
@@ -224,8 +296,9 @@ export class BoardGameScene extends Phaser.Scene {
       )
     );
 
-    parent.appendChild(container);
-    this.holdersEl = container;
+    inner.appendChild(container);
+    parent.appendChild(wrapper);
+    this.holdersEl = wrapper;
   }
 
   private buildHolder(
@@ -308,43 +381,44 @@ export class BoardGameScene extends Phaser.Scene {
   // ─── DRAW PILE ────────────────────────────────────────────────────
 
   private createDrawPile() {
-    const existing = document.getElementById("draw-pile");
+    const existing = document.getElementById("draw-pile-wrapper");
     if (existing) existing.remove();
 
     const parent = document.getElementById("game-container") ?? document.body;
-    const width = window.innerWidth;
-    const bgTex = this.textures.get("board_bg").getSourceImage();
-    const bgAspect = bgTex.height / bgTex.width;
-    const bgDisplayH = width * bgAspect;
+    const baseBgH = this.getBaseBgH();
 
-    const holderW = Math.min(width * 0.42, 750);
+    const holderW = BASE_WIDTH * 0.42;
     const holderH = holderW * 0.65;
-    const holderY = TOTAL_HUD + bgDisplayH * 0.35 - holderH / 2;
+    const holderY = TOTAL_HUD + baseBgH * 0.35 - holderH / 2;
 
     // Position below the sustainable holder (left side)
     const pileTop = holderY + holderH + 70;
-    const pileCenterX = width * 0.25;
+    const pileCenterX = BASE_WIDTH * 0.25;
+
+    // The table inside is (56*2.25 + 60) = 186px wide
+    const pileW = Math.floor(56 * 2.25) + 60;
+
+    const { wrapper, inner } = this.createScaledWrapper("draw-pile-wrapper", "10");
 
     const pile = this.buildDrawPile(this.policyDrawCount);
     pile.id = "draw-pile";
     Object.assign(pile.style, {
       position: "absolute",
       top: `${pileTop}px`,
-      left: `${pileCenterX}px`,
-      transform: "translateX(-50%)",
-      zIndex: "10",
+      left: `${pileCenterX - pileW / 2}px`,
       pointerEvents: "none",
     });
 
-    parent.appendChild(pile);
-    this.drawPileEl = pile;
+    inner.appendChild(pile);
+    parent.appendChild(wrapper);
+    this.drawPileEl = wrapper;
   }
 
   private buildDrawPile(count: number): HTMLDivElement {
     const scale = 2.25;
     const cardW = Math.floor(56 * scale);
     const cardH = Math.floor(74 * scale);
-    const stackOffset = 4.5; // px per card in the stack — increase for wider gaps
+    const stackOffset = 4.5;
     const maxVisibleCards = Math.min(count, 16);
 
     const wrapper = document.createElement("div");
@@ -439,21 +513,19 @@ export class BoardGameScene extends Phaser.Scene {
   // ─── HUD ──────────────────────────────────────────────────────────
 
   private createHUD() {
-    const existing = document.getElementById("board-hud");
+    const existing = document.getElementById("board-hud-wrapper");
     if (existing) existing.remove();
 
     const parent = document.getElementById("game-container") ?? document.body;
+    const { wrapper, inner } = this.createScaledWrapper("board-hud-wrapper", "100");
+    wrapper.style.pointerEvents = "auto";
 
     const hud = document.createElement("div");
     hud.id = "board-hud";
     Object.assign(hud.style, {
-      position: "absolute",
-      top: "0",
-      left: "0",
-      width: "100%",
+      width: `${BASE_WIDTH}px`,
       height: `${HUD_HEIGHT}px`,
       background: "#5c3d2e",
-      zIndex: "100",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -464,6 +536,7 @@ export class BoardGameScene extends Phaser.Scene {
       flexWrap: "wrap",
       padding: "12px",
       boxShadow: "0px 8px 0 rgba(0,0,0,0.5)",
+      position: "relative",
     });
 
     // ── Player cards ────────────────────────────────────────────────
@@ -526,8 +599,9 @@ export class BoardGameScene extends Phaser.Scene {
     this.statusEl = statusInfo;
     this.setStatus("Connecting...");
 
-    parent.appendChild(hud);
-    this.hudEl = hud;
+    inner.appendChild(hud);
+    parent.appendChild(wrapper);
+    this.hudEl = wrapper;
   }
 
   private setStatus(message: string) {

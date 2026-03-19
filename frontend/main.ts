@@ -12,11 +12,10 @@ import { PolicyEnactScene } from "./scenes/PolicyEnactScene";
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: "game-container",
-  width: 1280,
-  height: 720,
+  width: 1920,
+  height: 1080,
   scale: {
-    mode: Phaser.Scale.RESIZE,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
+    mode: Phaser.Scale.NONE,
     },
     input: {
         mouse: {
