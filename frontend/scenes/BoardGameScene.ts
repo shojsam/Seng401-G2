@@ -43,6 +43,11 @@ export class BoardGameScene extends Phaser.Scene {
   private policyDrawCount = 20;
   private resizeHandler?: () => void;
 
+  // Tracked Phaser objects (so layoutScene can clean them up properly)
+  private bgImage?: Phaser.GameObjects.Image;
+  private dimOverlay?: Phaser.GameObjects.Rectangle;
+  private hudBgFill?: Phaser.GameObjects.Rectangle;
+
   constructor() {
     super({ key: "BoardGameScene" });
   }
@@ -102,6 +107,28 @@ export class BoardGameScene extends Phaser.Scene {
       });
     }
 
+    if (!this.scene.isActive("CharacterSelectionScene")) {
+      this.scene.launch("CharacterSelectionScene", {
+        username: this.username,
+      });
+    }
+
+    if (!this.scene.isActive("PolicyDescScene")) {
+      this.scene.launch("PolicyDescScene", {
+        title: "CARBON TAX",
+        description:
+          "Impose a tax on carbon emissions from major industrial polluters. Revenue is redirected toward renewable energy infrastructure and green subsidies.",
+      });
+    }
+
+    if (!this.scene.isActive("DiscardPolicyScene")) {
+      this.scene.launch("DiscardPolicyScene");
+    }
+
+    if (!this.scene.isActive("PolicyEnactScene")) {
+      this.scene.launch("PolicyEnactScene");
+    }
+
     void this.syncLobbyState();
     this.connectWebSocket();
   }
@@ -117,16 +144,16 @@ export class BoardGameScene extends Phaser.Scene {
     this.game.canvas.style.width = `${width}px`;
     this.game.canvas.style.height = `${totalH}px`;
 
-    const oldBg = this.children.list.find(
-      (c) => c instanceof Phaser.GameObjects.Image && c.texture.key === "board_bg"
-    );
-    if (oldBg) oldBg.destroy();
+    // Destroy previous objects before recreating
+    if (this.bgImage) { this.bgImage.destroy(); this.bgImage = undefined; }
+    if (this.dimOverlay) { this.dimOverlay.destroy(); this.dimOverlay = undefined; }
+    if (this.hudBgFill) { this.hudBgFill.destroy(); this.hudBgFill = undefined; }
 
-    const bg = this.add.image(width / 2, TOTAL_HUD + bgDisplayH / 2, "board_bg");
-    bg.setDisplaySize(width, bgDisplayH);
-    bg.setDepth(0);
+    this.bgImage = this.add.image(width / 2, TOTAL_HUD + bgDisplayH / 2, "board_bg");
+    this.bgImage.setDisplaySize(width, bgDisplayH);
+    this.bgImage.setDepth(0);
 
-    const dimOverlay = this.add.rectangle(
+    this.dimOverlay = this.add.rectangle(
       width / 2,
       TOTAL_HUD + bgDisplayH / 2,
       width,
@@ -134,16 +161,10 @@ export class BoardGameScene extends Phaser.Scene {
       0x353b42,
       0.8
     );
-    dimOverlay.setDepth(1);
+    this.dimOverlay.setDepth(1);
 
-    const oldHudBg = this.children.list.find(
-      (c) => c instanceof Phaser.GameObjects.Rectangle && (c as { name?: string }).name === "hud_bg_fill"
-    );
-    if (oldHudBg) oldHudBg.destroy();
-
-    const hudBgFill = this.add.rectangle(width / 2, TOTAL_HUD / 2, width, TOTAL_HUD, 0x0d1b2a, 1);
-    (hudBgFill as { name?: string }).name = "hud_bg_fill";
-    hudBgFill.setDepth(0);
+    this.hudBgFill = this.add.rectangle(width / 2, TOTAL_HUD / 2, width, TOTAL_HUD, 0x0d1b2a, 1);
+    this.hudBgFill.setDepth(0);
   }
 
   // ─── DOM-BASED POLICY HOLDERS ─────────────────────────────────────
@@ -181,8 +202,8 @@ export class BoardGameScene extends Phaser.Scene {
       this.buildHolder(
         holderW,
         holderH,
-        "#1a5c32",
-        "#2b9d65",
+        "#66785a",
+        "#809671",
         "SUSTAINABLE",
         "REFORMERS MUST PASS 5\nSUSTAINABLE POLICIES TO WIN",
         this.sustainableCount,
@@ -194,8 +215,8 @@ export class BoardGameScene extends Phaser.Scene {
       this.buildHolder(
         holderW,
         holderH,
-        "#6b1a1a",
-        "#c0392b",
+        "#842929",
+        "#bc6262",
         "EXPLOITATIVE",
         "EXPLOITERS MUST PASS 3\nEXPLOITATIVE POLICIES TO WIN",
         this.exploitativeCount,
@@ -262,8 +283,7 @@ export class BoardGameScene extends Phaser.Scene {
         width: `${slotW}px`,
         height: `${slotH}px`,
         background: "rgba(0, 0, 0, 0.25)",
-        border: `2px solid ${borderColor}`,
-        borderRadius: "4px",
+        border: `4px solid ${borderColor}`,
         boxSizing: "border-box",
       });
       slotsRow.appendChild(slot);
@@ -348,7 +368,7 @@ export class BoardGameScene extends Phaser.Scene {
       width: `${tableW}px`,
       height: `${tableH}px`,
       background: "linear-gradient(to bottom, #5c3d2e, #4a3122)",
-      border: "4px solid #3a2518",
+      border: "4px solid #d4a843",
       boxShadow: "4px 4px 0 rgba(0,0,0,0.5)",
       boxSizing: "border-box",
       position: "relative",
@@ -432,7 +452,7 @@ export class BoardGameScene extends Phaser.Scene {
       left: "0",
       width: "100%",
       height: `${HUD_HEIGHT}px`,
-      background: "#353b42",
+      background: "#5c3d2e",
       zIndex: "100",
       display: "flex",
       alignItems: "center",
@@ -670,6 +690,22 @@ export class BoardGameScene extends Phaser.Scene {
 
     if (this.scene.isActive("NominationScene")) {
       this.scene.stop("NominationScene");
+    }
+
+    if (this.scene.isActive("CharacterSelectionScene")) {
+      this.scene.stop("CharacterSelectionScene");
+    }
+
+    if (this.scene.isActive("PolicyDescScene")) {
+      this.scene.stop("PolicyDescScene");
+    }
+
+    if (this.scene.isActive("DiscardPolicyScene")) {
+      this.scene.stop("DiscardPolicyScene");
+    }
+
+    if (this.scene.isActive("PolicyEnactScene")) {
+      this.scene.stop("PolicyEnactScene");
     }
   }
 }
