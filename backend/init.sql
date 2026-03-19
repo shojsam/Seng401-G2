@@ -75,5 +75,6 @@ CREATE TABLE IF NOT EXISTS cards (
     card_id INT AUTO_INCREMENT PRIMARY KEY,
     card_name VARCHAR(50) NOT NULL,
     card_type VARCHAR(50) NOT NULL,
-    card_detail TEXT
+    card_detail TEXT,
+    hover TEXT
 );

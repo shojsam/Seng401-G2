@@ -42,6 +42,22 @@ def initialize_database():
         connection.close()
 
 
+def ensure_cards_hover_column():
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    try:
+        cursor.execute("SHOW COLUMNS FROM cards LIKE 'hover'")
+        hover_column = cursor.fetchone()
+        if hover_column is None:
+            cursor.execute("ALTER TABLE cards ADD COLUMN hover TEXT AFTER card_detail")
+            connection.commit()
+            print("Added hover column to cards table")
+    finally:
+        cursor.close()
+        connection.close()
+
+
 def seed_database():
     connection = get_connection()
     cursor = connection.cursor()
@@ -55,36 +71,42 @@ def seed_database():
                 (
                     "Gigatonne Carbon Capture Roadmap",
                     "exploitative",
-                    "Scale up Carbon Capture and Storage (CCS), a technology that captures CO2 emissions from power plants and industrial facilities before they enter the atmosphere, compresses the carbon, and stores it deep underground in geological formations. Twenty years ago, global leaders projected CCS could capture 5,000 million tonnes of CO2 per year by now — and we aim to accelerate deployment to reach that scale.",
+                    "Scale up Carbon Capture and Storage (CCS), a technology that captures CO2 emissions from power plants and industrial facilities before they enter the atmosphere, compresses the carbon, and stores it deep underground in geological formations. Twenty years ago, global leaders projected CCS could capture 5,000 million tonnes of CO2 per year by now and we aim to accelerate deployment to reach that scale.",
+                    None,
                 ),
                 (
                     "Chevron Gorgon Flagship CCS Project",
                     "exploitative",
                     "Support flagship CCS facilities like the Gorgon gas project in Australia, which captures CO2 from natural gas processing, compresses it, and injects it underground to permanently prevent emissions from entering the atmosphere. This is the biggest CCS plant in the world. Carbon Capture and Storage, or CCS, is a technology that captures carbon from the air and buries it deep underground out of our atmosphere (like how trees do).",
+                    None,
                 ),
                 (
                     "CCUS Energy Expansion",
                     "exploitative",
-                    "Expand Carbon Capture, Utilization and Storage (CCUS), which captures CO2 and repurposes it for productive uses — such as injecting it into oil reservoirs to enhance energy recovery while storing carbon underground.",
+                    "Expand Carbon Capture, Utilization and Storage (CCUS), which captures CO2 and repurposes it for productive uses such as injecting it into oil reservoirs to enhance energy recovery while storing carbon underground.",
+                    None,
                 ),
                 (
                     "Clean Hydrogen with CCS",
                     "exploitative",
                     "Invest in clean hydrogen energy produced from coal or natural gas, with carbon capture technology used to trap emissions during production and store them underground, enabling low-carbon fuel for the future.",
+                    None,
                 ),
                 (
                     "Carbon Credit Market for Net Zero",
                     "exploitative",
-                    "Expand the national carbon credit market to accelerate Net Zero by 2050. Similar to how individuals can pay to offset their emissions from a flight, this system allows companies and governments to purchase carbon credits to compensate for their emissions. That money is spent on reducing emissions elsewhere, which is useful for offsetting emissions that are hard to avoid, like in aviation and agriculture. Landholders earn one credit for each tonne of carbon emissions they prevent or avoid — such as by planting trees or choosing not to clear vegetation. These credits can then be sold to emitters like gas companies, who use them to offset their own emissions and then become carbon neutral.",
+                    "Expand the national carbon credit market to accelerate Net Zero by 2050. Similar to how individuals can pay to offset their emissions from a flight, this system allows companies and governments to purchase carbon credits to compensate for their emissions. That money is spent on reducing emissions elsewhere, which is useful for offsetting emissions that are hard to avoid, like in aviation and agriculture. Landholders earn one credit for each tonne of carbon emissions they prevent or avoid such as by planting trees or choosing not to clear vegetation. These credits can then be sold to emitters like gas companies, who use them to offset their own emissions and then become carbon neutral.",
+                    None,
                 ),
                 (
                     "Social Media Ban for Under-16s",
                     "exploitative",
                     "Introduce a nationwide ban on social media access for users under 16 to protect young people from harmful online content, cyberbullying, and addictive platform design. The policy requires platforms to verify age and prevent under-16s from creating or maintaining accounts, ensuring a safer digital environment for children.",
+                    None,
                 ),
             ]
             cursor.executemany(
-                "INSERT INTO cards (card_name, card_type, card_detail) VALUES (%s, %s, %s)",
+                "INSERT INTO cards (card_name, card_type, card_detail, hover) VALUES (%s, %s, %s, %s)",
                 cards_data,
             )
 
@@ -123,6 +145,7 @@ def seed_database():
 
 def initialize_and_seed_database():
     initialize_database()
+    ensure_cards_hover_column()
     seed_database()
 
 
