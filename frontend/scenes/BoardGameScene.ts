@@ -8,7 +8,7 @@ const ASSETS = {
 };
 
 const HUD_HEIGHT = 250;
-const BORDER_HEIGHT = 3;
+const BORDER_HEIGHT = 5;
 const TOTAL_HUD = HUD_HEIGHT + BORDER_HEIGHT;
 
 interface PlayerData {
@@ -463,6 +463,7 @@ export class BoardGameScene extends Phaser.Scene {
       fontFamily: '"Jersey 20", sans-serif',
       flexWrap: "wrap",
       padding: "12px",
+      boxShadow: "0px 8px 0 rgba(0,0,0,0.5)",
     });
 
     // ── Player cards ────────────────────────────────────────────────
