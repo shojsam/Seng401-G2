@@ -36,6 +36,12 @@ type SocketMessage = {
   data?: Record<string, unknown>;
 };
 
+type RoleOverlayScene = Phaser.Scene & {
+  setRole: (role: "reformer" | "exploiter") => void;
+  show: () => void;
+  hide: () => void;
+};
+
 export class BoardGameScene extends Phaser.Scene {
   private players: PlayerData[] = [];
   private hudEl?: HTMLDivElement;
@@ -707,6 +713,23 @@ export class BoardGameScene extends Phaser.Scene {
     this.socket.send(JSON.stringify(data ? { type, data } : { type }));
   }
 
+  private getRoleScene(): RoleOverlayScene | null {
+    if (!this.scene.isActive("RoleScene")) {
+      return null;
+    }
+    return this.scene.get("RoleScene") as RoleOverlayScene;
+  }
+
+  private showRoleReveal(role: "reformer" | "exploiter") {
+    const roleScene = this.getRoleScene();
+    if (!roleScene) {
+      return;
+    }
+
+    roleScene.setRole(role);
+    roleScene.show();
+  }
+
   // ─── NETWORKING ───────────────────────────────────────────────────
 
   private async syncLobbyState() {
@@ -765,6 +788,8 @@ export class BoardGameScene extends Phaser.Scene {
           this.gameStarted = true;
           this.readyPlayers.clear();
           this.renderReadyPanel();
+          const role = message.data?.role === "exploiter" ? "exploiter" : "reformer";
+          this.showRoleReveal(role);
           this.setStatus("Game started");
           return;
         }
