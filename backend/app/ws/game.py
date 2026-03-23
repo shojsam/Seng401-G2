@@ -62,7 +62,10 @@ async def send_to_player(lobby: LobbyState, username: str, message: dict):
 
 
 async def broadcast_lobby_state(lobby: LobbyState):
-    players = list(lobby.players)
+    players = sorted(lobby.players)
+    ready_players = sorted(username for username in lobby.ready_players if username in lobby.players)
+    ready_count = len(ready_players)
+    all_ready = len(players) >= 5 and ready_count == len(players)
     await broadcast(
         lobby,
         {
@@ -72,6 +75,9 @@ async def broadcast_lobby_state(lobby: LobbyState):
                 "players": players,
                 "count": len(players),
                 "can_start": len(players) >= 5,
+                "ready_players": ready_players,
+                "ready_count": ready_count,
+                "all_ready": all_ready,
             },
         },
     )
@@ -104,6 +110,7 @@ async def handle_start_game(lobby: LobbyState, username: str):
         })
         return
 
+    lobby.ready_players.clear()
     lobby.game_state = GameState(list(lobby.players))
     gs = lobby.game_state
     start_info = gs.start_game()
