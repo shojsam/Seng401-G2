@@ -4,7 +4,7 @@
 import Phaser from "phaser";
 import { createGameSocket, getLobbyPlayers } from "../src/api";
 import type { GameState, SocketMessage } from "./GameState";
-import { updatePhaseBar } from "./HudBuilder";
+import { updatePhaseBar } from "./HUDBuilder";
 import { hideAllOverlays } from "./OverlayManager";
 
 /**

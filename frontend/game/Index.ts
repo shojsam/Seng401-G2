@@ -1,6 +1,6 @@
 export { GameState } from "./GameState";
 export type { PlayerData, BoardSceneData, SocketMessage, EnactedPolicy } from "./GameState";
-export { createHUD, updatePhaseBar, getPhaseDisplayText, TOTAL_HUD } from "./HudBuilder";
+export { createHUD, updatePhaseBar, getPhaseDisplayText, TOTAL_HUD } from "./HUDBuilder";
 export { createPolicyHolders } from "./PolicyHolderBuilder";
 export type { SlotClickHandler } from "./PolicyHolderBuilder";
 export { createDrawPile } from "./DrawPileBuilder";

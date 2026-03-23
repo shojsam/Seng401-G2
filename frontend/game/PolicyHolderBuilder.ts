@@ -5,7 +5,7 @@
  * to open PolicyDescScene with the policy's title and description.
  */
 import type { GameState, EnactedPolicy } from "./GameState";
-import { TOTAL_HUD } from "./HudBuilder";
+import { TOTAL_HUD } from "./HUDBuilder";
 
 const BASE_WIDTH = 1920;
 const ASSET_POLICY_FOLDER = "assets/policy_folder1.png";
