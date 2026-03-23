@@ -18,6 +18,7 @@ class LobbyState:
     code: str
     players: set[str] = field(default_factory=set)
     active_connections: dict[str, WebSocket] = field(default_factory=dict)
+    ready_players: set[str] = field(default_factory=set)
     game_state: GameState | None = None
 
 
@@ -99,7 +100,10 @@ def add_player(lobby_code: str, username: str) -> LobbyState | None:
         cursor.close()
         connection.close()
 
-    return get_lobby(code)
+    lobby = get_lobby(code)
+    if lobby is not None:
+        lobby.ready_players.discard(username)
+    return lobby
 
 
 def get_lobby_players(lobby_code: str) -> list[str] | None:
@@ -111,19 +115,21 @@ def get_lobby_players(lobby_code: str) -> list[str] | None:
 
 def remove_player(lobby: LobbyState, username: str):
     lobby.active_connections.pop(username, None)
+    lobby.ready_players.discard(username)
     _remove_player_record(lobby.code, username)
     refreshed = get_lobby(lobby.code)
     if refreshed is None:
         lobby.players.clear()
+        lobby.ready_players.clear()
         return
     lobby.players = refreshed.players
+    lobby.ready_players.intersection_update(lobby.players)
     _delete_if_empty(lobby)
 
 
 def reset_lobby(lobby: LobbyState):
-    lobby.players.clear()
+    lobby.ready_players.clear()
     lobby.game_state = None
-    _delete_if_empty(lobby)
 
 
 def _delete_if_empty(lobby: LobbyState):

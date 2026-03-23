@@ -1,7 +1,10 @@
+import asyncio
 import pytest
 from app.logic.game_engine import GameState, Phase
 from app.logic.voting import Vote
 from app.logic.deck import PolicyCard, PolicyType
+from app.state.lobbies import LobbyState
+from app.ws.game import handle_ready_up, handle_unready
 
 
 PLAYERS = ["alice", "bob", "charlie", "dave", "eve"]
@@ -244,3 +247,41 @@ class TestWinConditions:
         assert "sustainable_count" in summary
         assert "exploiter_count" in summary
         assert "roles" in summary
+
+
+class TestLobbyReadyFlow:
+    def test_last_ready_player_starts_game(self, monkeypatch):
+        lobby = LobbyState(code="ABC123", players=set(PLAYERS))
+        lobby.ready_players = set(PLAYERS[:-1])
+
+        events: list[str] = []
+
+        async def fake_broadcast_lobby_state(_lobby):
+            events.append("broadcast")
+
+        async def fake_handle_start_game(_lobby, username):
+            events.append(f"start:{username}")
+
+        monkeypatch.setattr("app.ws.game.broadcast_lobby_state", fake_broadcast_lobby_state)
+        monkeypatch.setattr("app.ws.game.handle_start_game", fake_handle_start_game)
+
+        asyncio.run(handle_ready_up(lobby, "eve"))
+
+        assert lobby.ready_players == set(PLAYERS)
+        assert events == ["broadcast", "start:eve"]
+
+    def test_unready_removes_player_and_broadcasts(self, monkeypatch):
+        lobby = LobbyState(code="ABC123", players=set(PLAYERS))
+        lobby.ready_players = set(PLAYERS)
+
+        events: list[str] = []
+
+        async def fake_broadcast_lobby_state(_lobby):
+            events.append("broadcast")
+
+        monkeypatch.setattr("app.ws.game.broadcast_lobby_state", fake_broadcast_lobby_state)
+
+        asyncio.run(handle_unready(lobby, "eve"))
+
+        assert lobby.ready_players == set(PLAYERS[:-1])
+        assert events == ["broadcast"]

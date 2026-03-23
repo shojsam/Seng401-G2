@@ -36,7 +36,10 @@ async def send_to_player(lobby: LobbyState, username: str, message: dict):
 
 
 async def broadcast_lobby_state(lobby: LobbyState):
-    players = list(lobby.players)
+    players = sorted(lobby.players)
+    ready_players = sorted(username for username in lobby.ready_players if username in lobby.players)
+    ready_count = len(ready_players)
+    all_ready = len(players) >= 5 and ready_count == len(players)
     await broadcast(
         lobby,
         {
@@ -46,6 +49,9 @@ async def broadcast_lobby_state(lobby: LobbyState):
                 "players": players,
                 "count": len(players),
                 "can_start": len(players) >= 5,
+                "ready_players": ready_players,
+                "ready_count": ready_count,
+                "all_ready": all_ready,
             },
         },
     )
@@ -77,6 +83,7 @@ async def handle_start_game(lobby: LobbyState, username: str):
         )
         return
 
+    lobby.ready_players.clear()
     lobby.game_state = GameState(list(lobby.players))
     game_state = lobby.game_state
     start_info = game_state.start_game()
@@ -129,6 +136,43 @@ async def handle_start_game(lobby: LobbyState, username: str):
                 },
             },
         )
+
+
+async def handle_ready_up(lobby: LobbyState, username: str):
+    if lobby.game_state is not None and lobby.game_state.phase != Phase.GAME_OVER:
+        await send_to_player(
+            lobby,
+            username,
+            {"type": "error", "data": {"message": "A game is already in progress"}},
+        )
+        return
+
+    if username not in lobby.players:
+        await send_to_player(
+            lobby,
+            username,
+            {"type": "error", "data": {"message": "You are not in this lobby"}},
+        )
+        return
+
+    if len(lobby.players) < 5:
+        await send_to_player(
+            lobby,
+            username,
+            {"type": "error", "data": {"message": "Need at least 5 players before readying up"}},
+        )
+        return
+
+    lobby.ready_players.add(username)
+    await broadcast_lobby_state(lobby)
+
+    if len(lobby.ready_players) == len(lobby.players):
+        await handle_start_game(lobby, username)
+
+
+async def handle_unready(lobby: LobbyState, username: str):
+    lobby.ready_players.discard(username)
+    await broadcast_lobby_state(lobby)
 
 
 async def handle_propose_policy(lobby: LobbyState, username: str, data: dict):
@@ -346,6 +390,7 @@ async def handle_skip_discussion(lobby: LobbyState, _username: str):
 async def handle_reset_game(lobby: LobbyState, _username: str):
     reset_lobby(lobby)
     await broadcast(lobby, {"type": "game_reset", "data": {"lobby_code": lobby.code, "message": "Game has been reset. Return to lobby."}})
+    await broadcast_lobby_state(lobby)
 
 
 @router.websocket("/ws/{lobby_code}/{username}")
@@ -373,6 +418,10 @@ async def game_ws(websocket: WebSocket, lobby_code: str, username: str):
 
             if msg_type == "start_game":
                 await handle_start_game(lobby, username)
+            elif msg_type == "ready_up":
+                await handle_ready_up(lobby, username)
+            elif msg_type == "unready":
+                await handle_unready(lobby, username)
             elif msg_type == "propose_policy":
                 await handle_propose_policy(lobby, username, msg_data)
             elif msg_type == "cast_vote":

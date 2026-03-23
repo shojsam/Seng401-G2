@@ -40,11 +40,15 @@ export class BoardGameScene extends Phaser.Scene {
   private players: PlayerData[] = [];
   private hudEl?: HTMLDivElement;
   private statusEl?: HTMLDivElement;
+  private readyPanelEl?: HTMLDivElement;
   private holdersEl?: HTMLDivElement;
   private drawPileEl?: HTMLDivElement;
   private username = "";
   private lobbyCode = "MAIN";
   private socket?: WebSocket;
+  private canStart = false;
+  private gameStarted = false;
+  private readyPlayers = new Set<string>();
 
   private sustainableCount = 0;
   private exploitativeCount = 0;
@@ -599,6 +603,24 @@ export class BoardGameScene extends Phaser.Scene {
     this.statusEl = statusInfo;
     this.setStatus("Connecting...");
 
+    const readyPanel = document.createElement("div");
+    readyPanel.id = "board-ready-panel";
+    Object.assign(readyPanel.style, {
+      position: "absolute",
+      top: "10px",
+      left: "14px",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "flex-start",
+      gap: "8px",
+      fontFamily: '"Jersey 20", sans-serif',
+      color: "#e8e4dc",
+      maxWidth: "360px",
+    });
+    hud.appendChild(readyPanel);
+    this.readyPanelEl = readyPanel;
+    this.renderReadyPanel();
+
     inner.appendChild(hud);
     parent.appendChild(wrapper);
     this.hudEl = wrapper;
@@ -612,6 +634,77 @@ export class BoardGameScene extends Phaser.Scene {
       `<span style="color:#d4a843">${this.lobbyCode}</span>` +
       ` · ` +
       `${message}`;
+  }
+
+  private renderReadyPanel() {
+    if (!this.readyPanelEl) return;
+
+    this.readyPanelEl.innerHTML = "";
+
+    if (this.gameStarted) {
+      return;
+    }
+
+    const info = document.createElement("div");
+    Object.assign(info.style, {
+      fontSize: "22px",
+      lineHeight: "1.25",
+      color: "#f0ebe3",
+    });
+
+    const readyCount = this.readyPlayers.size;
+    const playerCount = this.players.length;
+
+    if (playerCount < 5) {
+      info.textContent = `Waiting for players: ${playerCount}/5 in lobby`;
+      this.readyPanelEl.appendChild(info);
+      return;
+    }
+
+    info.textContent = `Ready check: ${readyCount}/${playerCount} players ready`;
+    this.readyPanelEl.appendChild(info);
+
+    const detail = document.createElement("div");
+    Object.assign(detail.style, {
+      fontSize: "18px",
+      lineHeight: "1.2",
+      color: "#d4cfc5",
+    });
+    detail.textContent = this.readyPlayers.has(this.username)
+      ? "You are ready. Waiting for the rest of the lobby."
+      : "All players must press ready to start the game.";
+    this.readyPanelEl.appendChild(detail);
+
+    const button = document.createElement("button");
+    const isReady = this.readyPlayers.has(this.username);
+    button.textContent = isReady ? "Unready" : "Ready";
+    button.disabled = !this.socket || this.socket.readyState !== WebSocket.OPEN;
+    Object.assign(button.style, {
+      minWidth: "160px",
+      height: "52px",
+      borderRadius: "4px",
+      border: "4px solid #e0b66a",
+      background: isReady ? "#6b6355" : "#37935a",
+      color: "#f0ebe3",
+      fontSize: "28px",
+      letterSpacing: "1px",
+      cursor: button.disabled ? "default" : "pointer",
+      boxShadow: "4px 4px 0 rgba(0,0,0,0.35)",
+      fontFamily: '"Jersey 20", sans-serif',
+    });
+    button.onclick = () => {
+      this.sendSocketMessage(isReady ? "unready" : "ready_up");
+    };
+    this.readyPanelEl.appendChild(button);
+  }
+
+  private sendSocketMessage(type: string, data?: Record<string, unknown>) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      this.setStatus("Socket not connected");
+      return;
+    }
+
+    this.socket.send(JSON.stringify(data ? { type, data } : { type }));
   }
 
   // ─── NETWORKING ───────────────────────────────────────────────────
@@ -640,6 +733,7 @@ export class BoardGameScene extends Phaser.Scene {
 
     socket.addEventListener("open", () => {
       this.setStatus("Connected");
+      this.renderReadyPanel();
     });
 
     socket.addEventListener("message", (event) => {
@@ -650,20 +744,59 @@ export class BoardGameScene extends Phaser.Scene {
           const players = Array.isArray(message.data?.players)
             ? (message.data.players as string[])
             : [];
+          const readyPlayers = Array.isArray(message.data?.ready_players)
+            ? (message.data.ready_players as string[])
+            : [];
           this.updatePlayers(players.map((name) => ({ name })));
-          this.setStatus(`${players.length} players`);
+          this.readyPlayers = new Set(readyPlayers);
+          this.canStart = Boolean(message.data?.can_start);
+          if (this.canStart && readyPlayers.length === players.length) {
+            this.setStatus("All players ready. Starting...");
+          } else if (this.canStart) {
+            this.setStatus(`${readyPlayers.length}/${players.length} ready`);
+          } else {
+            this.setStatus(`${players.length} players`);
+          }
+          this.renderReadyPanel();
+          return;
+        }
+
+        if (message.type === "game_started") {
+          this.gameStarted = true;
+          this.readyPlayers.clear();
+          this.renderReadyPanel();
+          this.setStatus("Game started");
           return;
         }
 
         if (message.type === "player_disconnected") {
           const disconnectedUser = String(message.data?.username ?? "A player");
+          this.readyPlayers.delete(disconnectedUser);
+          this.renderReadyPanel();
           this.setStatus(`${disconnectedUser} left`);
+          return;
+        }
+
+        if (message.type === "game_reset") {
+          this.gameStarted = false;
+          this.readyPlayers.clear();
+          this.renderReadyPanel();
+          this.setStatus("Game reset");
+          return;
+        }
+
+        if (message.type === "phase_change") {
+          const phase = String(message.data?.phase ?? "");
+          this.gameStarted = phase !== "lobby";
+          this.renderReadyPanel();
+          this.setStatus(phase.replace(/_/g, " "));
           return;
         }
 
         if (message.type === "error") {
           const backendMessage = String(message.data?.message ?? "Unknown error");
           this.setStatus(`Error: ${backendMessage}`);
+          this.renderReadyPanel();
         }
       } catch {
         this.setStatus("Bad message");
@@ -673,11 +806,13 @@ export class BoardGameScene extends Phaser.Scene {
     socket.addEventListener("close", () => {
       if (this.socket === socket) {
         this.setStatus("Disconnected");
+        this.renderReadyPanel();
       }
     });
 
     socket.addEventListener("error", () => {
       this.setStatus("Connection failed");
+      this.renderReadyPanel();
     });
   }
 
@@ -685,6 +820,11 @@ export class BoardGameScene extends Phaser.Scene {
 
   public updatePlayers(players: PlayerData[]) {
     this.players = players;
+    this.readyPlayers.forEach((name) => {
+      if (!players.some((player) => player.name === name)) {
+        this.readyPlayers.delete(name);
+      }
+    });
     this.createHUD();
   }
 
@@ -749,6 +889,7 @@ export class BoardGameScene extends Phaser.Scene {
     }
 
     this.statusEl = undefined;
+    this.readyPanelEl = undefined;
 
     if (this.resizeHandler) {
       window.removeEventListener("resize", this.resizeHandler);
