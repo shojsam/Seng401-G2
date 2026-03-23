@@ -4,8 +4,16 @@ const ASSETS = {
   player_basecard: "assets/player_basecard.png",
 };
 
+interface CandidateData {
+  name: string;
+  eligible: boolean;
+  characterId?: number;
+  roleLabel?: string;
+  roleColor?: string;
+}
+
 interface NominationData {
-  players?: { name: string; eligible: boolean }[];
+  players?: CandidateData[];
 }
 
 export class NominationScene extends Phaser.Scene {
@@ -14,7 +22,7 @@ export class NominationScene extends Phaser.Scene {
   private visible: boolean = false;
   private keyHandler?: (e: KeyboardEvent) => void;
 
-  private candidates: { name: string; eligible: boolean }[] = [];
+  private candidates: CandidateData[] = [];
   private selectedIndex: number | null = null;
 
   constructor() {
@@ -29,13 +37,6 @@ export class NominationScene extends Phaser.Scene {
     this.cameras.main.setVisible(false);
 
     this.buildOverlay();
-
-    this.keyHandler = (e: KeyboardEvent) => {
-      if (e.key === "n" || e.key === "N") {
-        this.toggleOverlay();
-      }
-    };
-    window.addEventListener("keydown", this.keyHandler);
 
     this.events.on("shutdown", this.cleanup, this);
     this.events.on("destroy", this.cleanup, this);
@@ -119,7 +120,7 @@ export class NominationScene extends Phaser.Scene {
 
     // ── Description ─────────────────────────────────────────────────
     const desc = document.createElement("div");
-    desc.textContent = "Nominate a player to become the next Chancellor.";
+    desc.textContent = "Nominate a player to become the next Vice.";
     Object.assign(desc.style, {
       fontSize: "24px",
       color: "#9e9a92",
@@ -151,7 +152,7 @@ export class NominationScene extends Phaser.Scene {
 
       Object.assign(card.style, {
         width: "130px",
-        height: "190px",
+        height: "210px",
         backgroundImage: `url("${ASSETS.player_basecard}")`,
         backgroundSize: "cover",
         backgroundPosition: "center",
@@ -160,7 +161,7 @@ export class NominationScene extends Phaser.Scene {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "flex-end",
-        paddingBottom: "12px",
+        paddingBottom: "10px",
         boxSizing: "border-box",
         overflow: "hidden",
         imageRendering: "pixelated",
@@ -193,16 +194,49 @@ export class NominationScene extends Phaser.Scene {
         card.appendChild(limitedLabel);
       }
 
+      // Character sprite
+      const charId = candidate.characterId || 0;
+      if (charId > 0) {
+        const charImg = document.createElement("img");
+        charImg.src = `assets/character${charId}.png`;
+        charImg.alt = candidate.name;
+        charImg.draggable = false;
+        Object.assign(charImg.style, {
+          width: "90px",
+          height: "auto",
+          objectFit: "contain",
+          imageRendering: "pixelated",
+          pointerEvents: "none",
+          marginBottom: "20px",
+        });
+        card.appendChild(charImg);
+      }
+
+      // Player name
       const name = document.createElement("div");
       name.textContent = candidate.name;
       Object.assign(name.style, {
-        fontSize: "24px",
+        fontSize: "22px",
         color: "#514b3f",
         fontFamily: '"Jersey 20", sans-serif',
         position: "relative",
         zIndex: "1",
       });
       card.appendChild(name);
+
+      // Role label (only shown if provided, e.g. exploiter sees other exploiters)
+      const roleLabel = document.createElement("div");
+      roleLabel.textContent = candidate.roleLabel || "";
+      Object.assign(roleLabel.style, {
+        fontSize: "18px",
+        color: candidate.roleColor || "#514b3f",
+        fontFamily: '"Jersey 20", sans-serif',
+        letterSpacing: candidate.roleLabel ? "1px" : "0",
+        minHeight: "22px",
+        position: "relative",
+        zIndex: "1",
+      });
+      card.appendChild(roleLabel);
 
       if (isEligible) {
         card.addEventListener("click", () => {
@@ -266,24 +300,7 @@ export class NominationScene extends Phaser.Scene {
     confirmRow.appendChild(confirmBtn);
     panel.appendChild(confirmRow);
 
-    // ── Hint ────────────────────────────────────────────────────────
-    const hint = document.createElement("div");
-    hint.textContent = "Press N to close";
-    Object.assign(hint.style, {
-      fontSize: "18px",
-      color: "#6b6860",
-      fontFamily: '"Jersey 20", sans-serif',
-      marginTop: "14px",
-      width: "100%",
-      textAlign: "center",
-    });
-    panel.appendChild(hint);
-
     overlay.appendChild(panel);
-
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) this.hide();
-    });
 
     parent.appendChild(overlay);
     this.overlayEl = overlay;

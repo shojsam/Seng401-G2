@@ -7,6 +7,7 @@ const ASSETS = {
 interface VotingData {
   nominatorName?: string;
   nomineeName?: string;
+  nomineeCharacterId?: number;
 }
 
 export class VotingScene extends Phaser.Scene {
@@ -18,6 +19,7 @@ export class VotingScene extends Phaser.Scene {
   // Data passed in via scene launch
   private nominatorName: string = "Player 1";
   private nomineeName: string = "Player 2";
+  private nomineeCharacterId: number = 0;
   private selectedVote: "aye" | "nay" | null = null;
 
   constructor() {
@@ -27,6 +29,7 @@ export class VotingScene extends Phaser.Scene {
   init(data: VotingData) {
     if (data.nominatorName) this.nominatorName = data.nominatorName;
     if (data.nomineeName) this.nomineeName = data.nomineeName;
+    if (data.nomineeCharacterId) this.nomineeCharacterId = data.nomineeCharacterId;
   }
 
   create() {
@@ -60,6 +63,7 @@ export class VotingScene extends Phaser.Scene {
   public show(data?: VotingData) {
     if (data?.nominatorName) this.nominatorName = data.nominatorName;
     if (data?.nomineeName) this.nomineeName = data.nomineeName;
+    if (data?.nomineeCharacterId !== undefined) this.nomineeCharacterId = data.nomineeCharacterId;
     this.selectedVote = null;
     this.buildOverlay();
     this.visible = true;
@@ -99,7 +103,6 @@ export class VotingScene extends Phaser.Scene {
     const panel = document.createElement("div");
     Object.assign(panel.style, {
       background: "#2a2e33",
-      borderRadius: "4px",
       border: "4px solid #4a4e55",
       padding: "36px 44px 40px",
       maxWidth: "680px",
@@ -156,6 +159,23 @@ export class VotingScene extends Phaser.Scene {
       imageRendering: "pixelated",
     });
 
+    // Character sprite (if available)
+    if (this.nomineeCharacterId > 0) {
+      const charImg = document.createElement("img");
+      charImg.src = `assets/character${this.nomineeCharacterId}.png`;
+      charImg.alt = this.nomineeName;
+      charImg.draggable = false;
+      Object.assign(charImg.style, {
+        width: "70px",
+        height: "93px",
+        objectFit: "contain",
+        imageRendering: "pixelated",
+        pointerEvents: "none",
+        marginBottom: "25px",
+      });
+      cardWrap.appendChild(charImg);
+    }
+
     const cardName = document.createElement("div");
     cardName.textContent = this.nomineeName;
     Object.assign(cardName.style, {
@@ -175,7 +195,7 @@ export class VotingScene extends Phaser.Scene {
     });
 
     const descLine1 = document.createElement("div");
-    descLine1.textContent = `${this.nominatorName} has nominated ${this.nomineeName} as chancellor.`;
+    descLine1.textContent = `${this.nominatorName} has nominated ${this.nomineeName} as Vice.`;
     Object.assign(descLine1.style, {
       fontSize: "26px",
       color: "#e8e4dc",
@@ -243,7 +263,6 @@ export class VotingScene extends Phaser.Scene {
       color: "#f0ebe3",
       background: "#7a6a52",
       border: "4px solid #bfa76a",
-      borderRadius: "4px",
       padding: "12px 52px",
       cursor: "pointer",
       boxShadow: "4px 4px 0 #3a3228",
@@ -274,25 +293,7 @@ export class VotingScene extends Phaser.Scene {
     confirmRow.appendChild(confirmBtn);
     panel.appendChild(confirmRow);
 
-    // ── Hint text ───────────────────────────────────────────────────
-    const hint = document.createElement("div");
-    hint.textContent = "Press V to close";
-    Object.assign(hint.style, {
-      fontSize: "18px",
-      color: "#6b6860",
-      fontFamily: '"Jersey 20", sans-serif',
-      marginTop: "14px",
-      width: "100%",
-      textAlign: "center",
-    });
-    panel.appendChild(hint);
-
     overlay.appendChild(panel);
-
-    // Click backdrop to close
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) this.hide();
-    });
 
     parent.appendChild(overlay);
     this.overlayEl = overlay;
@@ -321,27 +322,24 @@ export class VotingScene extends Phaser.Scene {
 
   private buildVoteButton(
     label: string,
-    bg: string,
+    bgColor: string,
     shadow: string,
-    vote: "aye" | "nay"
+    _value: "aye" | "nay"
   ): HTMLButtonElement {
     const btn = document.createElement("button");
     btn.classList.add("vote-btn");
-    btn.dataset.vote = vote;
     btn.textContent = label;
-
     Object.assign(btn.style, {
+      flex: "1",
       fontFamily: '"Jersey 20", sans-serif',
-      fontSize: "46px",
+      fontSize: "36px",
       fontWeight: "400",
-      letterSpacing: "3px",
+      textTransform: "uppercase",
+      letterSpacing: "2px",
       color: "#f0ebe3",
-      background: bg,
-      border: "4px solid rgba(255,255,255,0.2)",
-      borderRadius: "4px",
-      padding: "20px 0",
-      width: "100%",
-      maxWidth: "260px",
+      background: bgColor,
+      border: `4px solid ${bgColor}`,
+      padding: "18px 0",
       cursor: "pointer",
       boxShadow: `4px 4px 0 ${shadow}`,
       transition: "none",

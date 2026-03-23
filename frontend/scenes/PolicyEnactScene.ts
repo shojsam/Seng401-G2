@@ -47,13 +47,6 @@ export class PolicyEnactScene extends Phaser.Scene {
 
     this.buildOverlay();
 
-    this.keyHandler = (e: KeyboardEvent) => {
-      if (e.key === "e" || e.key === "E") {
-        this.toggleOverlay();
-      }
-    };
-    window.addEventListener("keydown", this.keyHandler);
-
     this.events.on("shutdown", this.cleanup, this);
     this.events.on("destroy", this.cleanup, this);
   }
@@ -241,24 +234,7 @@ export class PolicyEnactScene extends Phaser.Scene {
 
     panel.appendChild(cardRow);
 
-    // ── Hint ────────────────────────────────────────────────────────
-    const hint = document.createElement("div");
-    hint.textContent = "Press E to close";
-    Object.assign(hint.style, {
-      fontSize: "18px",
-      color: "#6b6860",
-      fontFamily: '"Jersey 20", sans-serif',
-      width: "100%",
-      textAlign: "center",
-    });
-    panel.appendChild(hint);
-
     overlay.appendChild(panel);
-
-    // Click backdrop to close
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) this.hide();
-    });
 
     parent.appendChild(overlay);
     this.overlayEl = overlay;

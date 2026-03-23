@@ -44,13 +44,6 @@ export class PolicyDescScene extends Phaser.Scene {
 
     this.buildOverlay();
 
-    this.keyHandler = (e: KeyboardEvent) => {
-      if (e.key === "p" || e.key === "P") {
-        this.toggleOverlay();
-      }
-    };
-    window.addEventListener("keydown", this.keyHandler);
-
     this.events.on("shutdown", this.cleanup, this);
     this.events.on("destroy", this.cleanup, this);
   }
@@ -228,31 +221,7 @@ export class PolicyDescScene extends Phaser.Scene {
     folder.appendChild(closeBtn);
 
     // ── Hint at bottom ──────────────────────────────────────────────
-    const hintWrap = document.createElement("div");
-    Object.assign(hintWrap.style, {
-      position: "absolute",
-      bottom: "-36px",
-      left: "0",
-      width: "100%",
-      textAlign: "center",
-    });
-
-    const hint = document.createElement("div");
-    hint.textContent = "Press P to close";
-    Object.assign(hint.style, {
-      fontSize: "18px",
-      color: "#6b6860",
-      fontFamily: '"Jersey 20", sans-serif',
-    });
-    hintWrap.appendChild(hint);
-    folder.appendChild(hintWrap);
-
     overlay.appendChild(folder);
-
-    // Click backdrop to close
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) this.hide();
-    });
 
     parent.appendChild(overlay);
     this.overlayEl = overlay;

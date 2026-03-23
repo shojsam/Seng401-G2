@@ -45,13 +45,6 @@ export class CharacterSelectionScene extends Phaser.Scene {
 
     this.buildOverlay();
 
-    this.keyHandler = (e: KeyboardEvent) => {
-      if (e.key === "c" || e.key === "C") {
-        this.toggleOverlay();
-      }
-    };
-    window.addEventListener("keydown", this.keyHandler);
-
     this.events.on("shutdown", this.cleanup, this);
     this.events.on("destroy", this.cleanup, this);
   }
@@ -266,25 +259,7 @@ export class CharacterSelectionScene extends Phaser.Scene {
     confirmRow.appendChild(confirmBtn);
     panel.appendChild(confirmRow);
 
-    // ── Hint ────────────────────────────────────────────────────────
-    const hint = document.createElement("div");
-    hint.textContent = "Press C to close";
-    Object.assign(hint.style, {
-      fontSize: "18px",
-      color: "#6b6860",
-      fontFamily: '"Jersey 20", sans-serif',
-      marginTop: "14px",
-      width: "100%",
-      textAlign: "center",
-    });
-    panel.appendChild(hint);
-
     overlay.appendChild(panel);
-
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) this.hide();
-    });
-
     parent.appendChild(overlay);
     this.overlayEl = overlay;
 

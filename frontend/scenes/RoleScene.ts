@@ -82,14 +82,6 @@ export class RoleScene extends Phaser.Scene {
     // Hide the Phaser canvas layer for this scene — it's purely DOM
     this.cameras.main.setAlpha(0);
 
-    // Register the R key toggle
-    if (this.input.keyboard) {
-      this.toggleKey = this.input.keyboard.addKey(
-        Phaser.Input.Keyboard.KeyCodes.R
-      );
-      this.toggleKey.on("down", () => this.toggle());
-    }
-
     // Build the DOM overlay (starts hidden)
     this.buildOverlay();
 
@@ -154,11 +146,6 @@ export class RoleScene extends Phaser.Scene {
       background: "rgba(0, 0, 0, 0.75)",
       fontFamily: '"Jersey 20", sans-serif',
       imageRendering: "pixelated",
-    });
-
-    // Close when clicking the dim area (not the card)
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) this.toggle();
     });
 
     // ── Modal card ──────────────────────────────────────────────────
@@ -317,21 +304,12 @@ export class RoleScene extends Phaser.Scene {
       btn.style.boxShadow = `4px 4px 0 ${shadowColor}`;
     });
 
-    btn.addEventListener("click", () => this.toggle());
+    btn.addEventListener("click", () => {
+    this.events.emit("role-acknowledged");
+    this.toggle();
+  });
 
     modal.appendChild(btn);
-
-    // ── Hint text ───────────────────────────────────────────────────
-    const hint = document.createElement("div");
-    hint.textContent = "Press R to toggle this card";
-    Object.assign(hint.style, {
-      marginTop: "14px",
-      fontSize: "18px",
-      color: "#6b6860",
-      fontFamily: '"Jersey 20", sans-serif',
-      letterSpacing: "0.5px",
-    });
-    modal.appendChild(hint);
 
     overlay.appendChild(modal);
     parent.appendChild(overlay);
