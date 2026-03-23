@@ -12,7 +12,7 @@
 import Phaser from "phaser";
 import { createGameSocket, getLobbyPlayers, leaveLobby } from "../src/api";
 import { GameState } from "../game/GameState";
-import { createHUD, updatePhaseBar, TOTAL_HUD } from "../game/HUdBuilder";
+import { createHUD, updatePhaseBar, TOTAL_HUD } from "../game/HUDBuilder";
 import { createPolicyHolders } from "../game/PolicyHolderBuilder";
 import { createDrawPile } from "../game/DrawPileBuilder";
 import { setupOverlayListeners, hideAllOverlays } from "../game/OverlayManager";
