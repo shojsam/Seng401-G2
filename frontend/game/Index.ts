@@ -7,3 +7,4 @@ export { createDrawPile } from "./DrawPileBuilder";
 export { setupOverlayListeners, hideAllOverlays } from "./OverlayManager";
 export { connectWebSocket, syncLobbyState } from "./GameSocketHandler";
 export type { SocketUICallbacks } from "./GameSocketHandler";
+export { announcePhase, dismissAnnouncer } from "./PhaseAnnouncer";

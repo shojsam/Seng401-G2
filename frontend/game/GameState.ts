@@ -53,4 +53,14 @@ export class GameState {
 
   // Character selection progress text
   characterProgress = "";
+
+  // Voting results — stores each player's vote after election resolves
+  // Key = player name, value = "approve" | "reject"
+  playerVotes: Record<string, string> = {};
+  lastElectionApproved: boolean | null = null;
+
+  // Pending hand data — stored when leader_hand / vice_hand arrives
+  // before the phase announcement finishes, so it can be re-shown after
+  pendingLeaderHand: { title: string; description: string }[] | null = null;
+  pendingViceHand: { title: string; description: string }[] | null = null;
 }

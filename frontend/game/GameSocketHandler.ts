@@ -6,6 +6,7 @@ import { createGameSocket, getLobbyPlayers } from "../src/api";
 import type { GameState, SocketMessage } from "./GameState";
 import { updatePhaseBar } from "./HUDBuilder";
 import { hideAllOverlays } from "./OverlayManager";
+import { announcePhase, dismissAnnouncer } from "./PhaseAnnouncer";
 
 /**
  * Callbacks that the socket handler uses to trigger UI rebuilds.
@@ -18,6 +19,65 @@ export interface SocketUICallbacks {
   rebuildDrawPile: () => void;
   updatePlayers: (names: string[]) => void;
   getPhaseBarEl: () => HTMLDivElement | undefined;
+}
+
+// ─── Message hold / deferral state ──────────────────────────────
+// Messages can be held during:
+//   1. Voting results display (5 seconds)
+//   2. Phase announcement overlay (~3 seconds)
+// Held messages are queued and replayed in order once the hold ends.
+let holdActive = false;
+let deferredMessages: {
+  msg: SocketMessage;
+  scene: Phaser.Scene;
+  state: GameState;
+  sendMessage: (type: string, data?: Record<string, unknown>) => void;
+  ui: SocketUICallbacks;
+}[] = [];
+
+// Message types that should be deferred during any hold
+const DEFERRED_TYPES = new Set([
+  "phase_change",
+  "leader_hand",
+  "vice_hand",
+  "nomination",
+  "round_result",
+]);
+
+/**
+ * Begin a hold period. Messages in DEFERRED_TYPES will be queued.
+ * After `durationMs`, the hold ends and queued messages replay.
+ * On replay, phase_change messages are processed first so their
+ * announcements can re-defer leader_hand / vice_hand messages.
+ */
+function beginHold(durationMs: number) {
+  holdActive = true;
+
+  setTimeout(() => {
+    holdActive = false;
+
+    // Sort: phase_change first, then everything else in original order.
+    // This ensures announcements fire before overlay-triggering messages,
+    // so the new announcement's hold can re-queue them.
+    const queued = [...deferredMessages];
+    deferredMessages = [];
+
+    const phaseChanges = queued.filter((e) => e.msg.type === "phase_change");
+    const others = queued.filter((e) => e.msg.type !== "phase_change");
+
+    for (const entry of phaseChanges) {
+      handleSocketMessage(entry.msg, entry.scene, entry.state, entry.sendMessage, entry.ui);
+    }
+    for (const entry of others) {
+      handleSocketMessage(entry.msg, entry.scene, entry.state, entry.sendMessage, entry.ui);
+    }
+  }, durationMs);
+}
+
+/** Cancel any active hold and discard queued messages. */
+function cancelHold() {
+  holdActive = false;
+  deferredMessages = [];
 }
 
 export function connectWebSocket(
@@ -61,6 +121,13 @@ function handleSocketMessage(
   const { type, data } = msg;
   if (!type) return;
 
+  // If a hold is active, queue messages that would show overlays
+  // or change the phase so they don't interrupt the current display
+  if (holdActive && DEFERRED_TYPES.has(type)) {
+    deferredMessages.push({ msg, scene, state, sendMessage, ui });
+    return;
+  }
+
   switch (type) {
     case "lobby_update": {
       const players = Array.isArray(data?.players) ? (data.players as string[]) : [];
@@ -81,13 +148,13 @@ function handleSocketMessage(
     case "role_ack_progress":
       break; // UI-only, handled by phase bar
     case "election_result":
-      onElectionResult(data ?? {}, scene, state);
+      onElectionResult(data ?? {}, scene, state, ui);
       break;
     case "leader_hand":
-      onLeaderHand(data ?? {}, scene);
+      onLeaderHand(data ?? {}, scene, state);
       break;
     case "vice_hand":
-      onViceHand(data ?? {}, scene);
+      onViceHand(data ?? {}, scene, state);
       break;
     case "round_result":
       onRoundResult(data ?? {}, scene, state, ui);
@@ -161,42 +228,81 @@ function onPhaseChange(
   ui.rebuildPolicyHolders();
   ui.rebuildHUD();
 
-  // Nomination: show overlay for leader
-  if (state.gamePhase === "nomination" && state.username === state.currentLeader) {
-    const iAmExploiter = state.myRole === "exploiter";
-    const candidates = state.players
-      .filter((p) => p.name !== state.username)
-      .map((p) => {
-        const charId = p.characterId || state.playerCharacters[p.name] || 0;
-        const playerIsExploiter = state.exploiterIds.includes(p.name);
-        let roleLabel = "";
-        let roleColor = "";
-        if (iAmExploiter && playerIsExploiter) {
-          roleLabel = "EXPLOITER";
-          roleColor = "#842929";
-        }
-        return { name: p.name, eligible: true, characterId: charId, roleLabel, roleColor };
-      });
+  // Show full-screen phase announcement and hold incoming messages
+  // (like leader_hand, vice_hand) until it finishes
+  const announceDuration = announcePhase(state.gamePhase, state);
 
-    const nominationScene = scene.scene.get("NominationScene") as
-      { show: (d: { players: typeof candidates }) => void } | undefined;
-    if (nominationScene) {
-      nominationScene.show({ players: candidates });
-    }
-  }
+  // Delay overlay triggers until after the announcement finishes.
+  // If no announcement was shown (duration 0), fire immediately.
+  const showOverlays = () => {
+    // Nomination: show overlay for leader
+    if (state.gamePhase === "nomination" && state.username === state.currentLeader) {
+      const iAmExploiter = state.myRole === "exploiter";
+      const candidates = state.players
+        .filter((p) => p.name !== state.username)
+        .map((p) => {
+          const charId = p.characterId || state.playerCharacters[p.name] || 0;
+          const playerIsExploiter = state.exploiterIds.includes(p.name);
+          let roleLabel = "";
+          let roleColor = "";
+          if (iAmExploiter && playerIsExploiter) {
+            roleLabel = "EXPLOITER";
+            roleColor = "#842929";
+          }
+          return { name: p.name, eligible: true, characterId: charId, roleLabel, roleColor };
+        });
 
-  // Election: show voting overlay
-  if (state.gamePhase === "election") {
-    const nomineeCharId = state.playerCharacters[state.currentVice] || 0;
-    const votingScene = scene.scene.get("VotingScene") as
-      { show: (d: { nominatorName: string; nomineeName: string; nomineeCharacterId?: number }) => void } | undefined;
-    if (votingScene) {
-      votingScene.show({
-        nominatorName: state.currentLeader,
-        nomineeName: state.currentVice,
-        nomineeCharacterId: nomineeCharId,
-      });
+      const nominationScene = scene.scene.get("NominationScene") as
+        { show: (d: { players: typeof candidates }) => void } | undefined;
+      if (nominationScene) {
+        nominationScene.show({ players: candidates });
+      }
     }
+
+    // Election: show voting overlay
+    if (state.gamePhase === "election") {
+      const nomineeCharId = state.playerCharacters[state.currentVice] || 0;
+      const votingScene = scene.scene.get("VotingScene") as
+        { show: (d: { nominatorName: string; nomineeName: string; nomineeCharacterId?: number }) => void } | undefined;
+      if (votingScene) {
+        votingScene.show({
+          nominatorName: state.currentLeader,
+          nomineeName: state.currentVice,
+          nomineeCharacterId: nomineeCharId,
+        });
+      }
+    }
+
+    // Re-show pending leader hand (Discard overlay) if it arrived early
+    if (state.gamePhase === "leader_discard" && state.pendingLeaderHand) {
+      const policies = state.pendingLeaderHand;
+      state.pendingLeaderHand = null;
+      const discardScene = scene.scene.get("DiscardPolicyScene") as
+        { show: (d: { policies: typeof policies }) => void } | undefined;
+      if (discardScene) discardScene.show({ policies });
+    }
+
+    // Re-show pending vice hand (Enact overlay) if it arrived early
+    if (state.gamePhase === "vice_enact" && state.pendingViceHand) {
+      const policies = state.pendingViceHand;
+      state.pendingViceHand = null;
+      const enactScene = scene.scene.get("PolicyEnactScene") as
+        { show: (d: { policies: typeof policies }) => void } | undefined;
+      if (enactScene) enactScene.show({ policies });
+    }
+  };
+
+  if (announceDuration > 0) {
+    // Hide any overlays that may have already been shown by
+    // leader_hand / vice_hand arriving before this phase_change
+    hideAllOverlays(scene);
+
+    // Begin a hold so leader_hand / vice_hand arriving during the
+    // announcement get queued and replayed after it finishes
+    beginHold(announceDuration);
+    setTimeout(showOverlays, announceDuration);
+  } else {
+    showOverlays();
   }
 }
 
@@ -209,14 +315,61 @@ function onElectionResult(
   data: Record<string, unknown>,
   scene: Phaser.Scene,
   state: GameState,
+  ui: SocketUICallbacks,
 ) {
   const approved = Boolean(data.approved);
+  const votes = (data.votes ?? {}) as Record<string, string>;
+
+  // Hide the voting overlay immediately
   const votingScene = scene.scene.get("VotingScene") as { hide: () => void } | undefined;
   if (votingScene) votingScene.hide();
-  if (!approved) state.currentVice = "";
+
+  // Store votes and result in state for HUD display
+  state.playerVotes = votes;
+  state.lastElectionApproved = approved;
+
+  // Enter the voting_results phase (client-side only)
+  state.gamePhase = "voting_results";
+  updatePhaseBar(ui.getPhaseBarEl(), state);
+  ui.rebuildHUD();
+
+  // Hold for 5 seconds — incoming phase_change / leader_hand
+  // messages get queued and replayed after the hold ends.
+  // Using a manual hold + setTimeout (real wall-clock time)
+  // so the timer doesn't pause when the tab is inactive.
+  holdActive = true;
+  deferredMessages = [];
+
+  setTimeout(() => {
+    // Clear voting data
+    state.playerVotes = {};
+    state.lastElectionApproved = null;
+    if (!approved) state.currentVice = "";
+
+    holdActive = false;
+
+    // Replay deferred messages — phase_change first so announcements
+    // fire before overlay-triggering messages like leader_hand
+    const queued = [...deferredMessages];
+    deferredMessages = [];
+
+    const phaseChanges = queued.filter((e) => e.msg.type === "phase_change");
+    const others = queued.filter((e) => e.msg.type !== "phase_change");
+
+    for (const entry of phaseChanges) {
+      handleSocketMessage(entry.msg, entry.scene, entry.state, entry.sendMessage, entry.ui);
+    }
+    for (const entry of others) {
+      handleSocketMessage(entry.msg, entry.scene, entry.state, entry.sendMessage, entry.ui);
+    }
+
+    // If no deferred messages updated things, rebuild to clear badges
+    ui.rebuildHUD();
+    updatePhaseBar(ui.getPhaseBarEl(), state);
+  }, 5000);
 }
 
-function onLeaderHand(data: Record<string, unknown>, scene: Phaser.Scene) {
+function onLeaderHand(data: Record<string, unknown>, scene: Phaser.Scene, state: GameState) {
   const cards = Array.isArray(data.cards)
     ? (data.cards as { title?: string; description?: string; policy_type?: string }[])
     : [];
@@ -224,12 +377,16 @@ function onLeaderHand(data: Record<string, unknown>, scene: Phaser.Scene) {
     title: String(c.title ?? c.policy_type ?? "Policy"),
     description: String(c.description ?? ""),
   }));
+
+  // Store in state so it can be re-shown after announcement
+  state.pendingLeaderHand = policies;
+
   const discardScene = scene.scene.get("DiscardPolicyScene") as
     { show: (d: { policies: typeof policies }) => void } | undefined;
   if (discardScene) discardScene.show({ policies });
 }
 
-function onViceHand(data: Record<string, unknown>, scene: Phaser.Scene) {
+function onViceHand(data: Record<string, unknown>, scene: Phaser.Scene, state: GameState) {
   const cards = Array.isArray(data.cards)
     ? (data.cards as { title?: string; description?: string; policy_type?: string }[])
     : [];
@@ -237,6 +394,10 @@ function onViceHand(data: Record<string, unknown>, scene: Phaser.Scene) {
     title: String(c.title ?? c.policy_type ?? "Policy"),
     description: String(c.description ?? ""),
   }));
+
+  // Store in state so it can be re-shown after announcement
+  state.pendingViceHand = policies;
+
   const enactScene = scene.scene.get("PolicyEnactScene") as
     { show: (d: { policies: typeof policies }) => void } | undefined;
   if (enactScene) enactScene.show({ policies });
@@ -259,9 +420,11 @@ function onRoundResult(
     policy_type?: string;
   } | undefined;
 
+  let policyTitle = "Policy";
   if (enacted) {
+    policyTitle = String(enacted.title ?? "Policy");
     const policy = {
-      title: String(enacted.title ?? "Policy"),
+      title: policyTitle,
       description: String(enacted.description ?? ""),
       policy_type: enacted.policy_type as "sustainable" | "exploitative",
     };
@@ -275,6 +438,23 @@ function onRoundResult(
   hideAllOverlays(scene);
   ui.rebuildPolicyHolders();
   ui.rebuildDrawPile();
+
+  // Show "POLICY ENACTED" announcement and hold the next phase_change
+  const policyType = enacted?.policy_type ?? "";
+  const subtitle = policyType === "sustainable"
+    ? `${policyTitle} — A sustainable policy was enacted.`
+    : policyType === "exploitative"
+      ? `${policyTitle} — An exploitative policy was enacted.`
+      : `${policyTitle} has been enacted.`;
+
+  // Temporarily set phase to "resolution" so the announcer picks it up
+  state.gamePhase = "resolution";
+  updatePhaseBar(ui.getPhaseBarEl(), state);
+
+  const announceDuration = announcePhase("resolution", state, subtitle);
+  if (announceDuration > 0) {
+    beginHold(announceDuration);
+  }
 }
 
 function onGameOver(
@@ -294,6 +474,8 @@ function onGameOver(
   }
 
   hideAllOverlays(scene);
+  dismissAnnouncer();
+  announcePhase("game_over", state);
   ui.rebuildHUD();
 }
 
@@ -302,6 +484,9 @@ function onGameReset(
   state: GameState,
   ui: SocketUICallbacks,
 ) {
+  // Cancel any active hold
+  cancelHold();
+
   state.gamePhase = "lobby";
   updatePhaseBar(ui.getPhaseBarEl(), state);
   state.myRole = "";
@@ -313,8 +498,13 @@ function onGameReset(
   state.policyDrawCount = 17;
   state.enactedSustainable = [];
   state.enactedExploitative = [];
+  state.playerVotes = {};
+  state.lastElectionApproved = null;
+  state.pendingLeaderHand = null;
+  state.pendingViceHand = null;
 
   hideAllOverlays(scene);
+  dismissAnnouncer();
   ui.rebuildHUD();
   ui.rebuildPolicyHolders();
   ui.rebuildDrawPile();

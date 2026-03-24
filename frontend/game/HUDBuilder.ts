@@ -137,7 +137,33 @@ function buildPlayerCard(player: PlayerData, state: GameState): HTMLDivElement {
     boxSizing: "border-box",
     overflow: "hidden",
     boxShadow: isLeader ? "0 0 12px rgba(212, 168, 67, 0.5)" : "none",
+    position: "relative",
   });
+
+  // ── Vote badge (top-right corner, shown during voting_results phase) ──
+  if (state.gamePhase === "voting_results" && state.playerVotes) {
+    const vote = state.playerVotes[player.name];
+    if (vote) {
+      const isAye = vote === "approve";
+      const badge = document.createElement("div");
+      badge.textContent = isAye ? "AYE" : "NAY";
+      Object.assign(badge.style, {
+        position: "absolute",
+        top: "6px",
+        right: "6px",
+        background: isAye ? "#4a7c3f" : "#842929",
+        color: "#e8e4dc",
+        fontSize: "18px",
+        fontFamily: '"Jersey 20", sans-serif',
+        letterSpacing: "1px",
+        padding: "2px 8px",
+        boxShadow: "2px 2px 0 rgba(0,0,0,0.4)",
+        zIndex: "10",
+        lineHeight: "1.2",
+      });
+      card.appendChild(badge);
+    }
+  }
 
   // Character sprite
   const charId = player.characterId || state.playerCharacters[player.name] || 0;
@@ -216,6 +242,19 @@ export function getPhaseDisplayText(state: GameState): string {
         : `${state.currentLeader || "Leader"} is nominating a Vice...`;
     case "election":
       return "Election — Vote on the Leader/Vice pair";
+    case "voting_results": {
+      // Show tally: e.g. "The tally was 4-1. The vote was successful."
+      const votes = state.playerVotes;
+      let ayeCount = 0;
+      let nayCount = 0;
+      for (const v of Object.values(votes)) {
+        if (v === "approve") ayeCount++;
+        else nayCount++;
+      }
+      const passed = state.lastElectionApproved;
+      const resultWord = passed ? "successful" : "unsuccessful";
+      return `The tally was ${ayeCount}-${nayCount}. The vote was ${resultWord}.`;
+    }
     case "leader_discard":
       return state.username === state.currentLeader
         ? "Your turn — Discard 1 policy card"
