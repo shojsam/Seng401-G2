@@ -3,6 +3,7 @@
  *
  * Filled slots show the policy_folder1.png image and are clickable
  * to open PolicyDescScene with the policy's title and description.
+ * A blue "?" context button appears below each filled slot.
  */
 import type { GameState, EnactedPolicy } from "./GameState";
 import { TOTAL_HUD } from "./HUDBuilder";
@@ -16,11 +17,18 @@ const ASSET_POLICY_FOLDER = "assets/policy_folder1.png";
  */
 export type SlotClickHandler = (policy: EnactedPolicy) => void;
 
+/**
+ * onContextClick is called when a player clicks the "?" button below a slot.
+ * The caller (BoardGameScene) provides a function that opens ContextScene.
+ */
+export type ContextClickHandler = (policy: EnactedPolicy) => void;
+
 export function createPolicyHolders(
   state: GameState,
   getBgAspect: () => number,
   createScaledWrapper: (id: string, zIndex: string) => { wrapper: HTMLDivElement; inner: HTMLDivElement },
   onSlotClick?: SlotClickHandler,
+  onContextClick?: ContextClickHandler,
 ): HTMLDivElement {
   const existing = document.getElementById("policy-holders-wrapper");
   if (existing) existing.remove();
@@ -52,7 +60,7 @@ export function createPolicyHolders(
       holderW, holderH, "#66785a", "#809671",
       "SUSTAINABLE",
       "REFORMERS MUST PASS 5\nSUSTAINABLE POLICIES TO WIN",
-      state.enactedSustainable, 5, onSlotClick,
+      state.enactedSustainable, 5, onSlotClick, onContextClick,
     )
   );
 
@@ -61,7 +69,7 @@ export function createPolicyHolders(
       holderW, holderH, "#842929", "#bc6262",
       "EXPLOITATIVE",
       "EXPLOITERS MUST PASS 3\nEXPLOITATIVE POLICIES TO WIN",
-      state.enactedExploitative, 3, onSlotClick,
+      state.enactedExploitative, 3, onSlotClick, onContextClick,
     )
   );
 
@@ -76,6 +84,7 @@ function buildHolder(
   titleText: string, descText: string,
   enactedPolicies: EnactedPolicy[], total: number,
   onSlotClick?: SlotClickHandler,
+  onContextClick?: ContextClickHandler,
 ): HTMLDivElement {
   const holder = document.createElement("div");
   Object.assign(holder.style, {
@@ -107,7 +116,7 @@ function buildHolder(
   const slotsRow = document.createElement("div");
   Object.assign(slotsRow.style, {
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
     gap: "10px",
   });
@@ -118,9 +127,18 @@ function buildHolder(
   const filled = enactedPolicies.length;
 
   for (let i = 0; i < total; i++) {
-    const slot = document.createElement("div");
     const isFilled = i < filled;
 
+    // Column wrapper for slot + context button
+    const col = document.createElement("div");
+    Object.assign(col.style, {
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: "6px",
+    });
+
+    const slot = document.createElement("div");
     Object.assign(slot.style, {
       width: `${slotW}px`,
       height: `${slotH}px`,
@@ -166,7 +184,50 @@ function buildHolder(
       });
     }
 
-    slotsRow.appendChild(slot);
+    col.appendChild(slot);
+
+    // ── Context "?" button below filled slots ───────────────────
+    if (isFilled) {
+      const policy = enactedPolicies[i];
+      const ctxBtn = document.createElement("button");
+      ctxBtn.textContent = "?";
+      Object.assign(ctxBtn.style, {
+        width: "28px",
+        height: "28px",
+        background: "#4a6fa5",
+        border: "3px solid #6b8fc4",
+        borderRadius: "4px",
+        color: "#e8e4dc",
+        fontSize: "18px",
+        fontFamily: '"Jersey 20", sans-serif',
+        fontWeight: "400",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "0",
+        lineHeight: "1",
+        boxShadow: "2px 2px 0 rgba(0,0,0,0.3)",
+        imageRendering: "pixelated",
+        pointerEvents: "auto",
+      });
+
+      ctxBtn.addEventListener("mouseenter", () => {
+        ctxBtn.style.filter = "brightness(1.2)";
+      });
+      ctxBtn.addEventListener("mouseleave", () => {
+        ctxBtn.style.filter = "none";
+      });
+
+      ctxBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (onContextClick) onContextClick(policy);
+      });
+
+      col.appendChild(ctxBtn);
+    }
+
+    slotsRow.appendChild(col);
   }
   holder.appendChild(slotsRow);
 

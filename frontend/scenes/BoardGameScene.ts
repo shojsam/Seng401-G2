@@ -152,6 +152,13 @@ export class BoardGameScene extends Phaser.Scene {
           policyDescScene.show({ title: policy.title, description: policy.description });
         }
       },
+      (policy) => {
+        const contextScene = this.scene.get("ContextScene") as
+          { show: (d: { title: string; context: string }) => void } | undefined;
+        if (contextScene) {
+          contextScene.show({ title: policy.title, context: "Context content coming soon." });
+        }
+      },
     );
   }
 
@@ -180,6 +187,8 @@ export class BoardGameScene extends Phaser.Scene {
       this.scene.launch("DiscardPolicyScene");
     if (!this.scene.isActive("PolicyEnactScene"))
       this.scene.launch("PolicyEnactScene");
+    if (!this.scene.isActive("ContextScene"))
+      this.scene.launch("ContextScene", { title: "", context: "" });
   }
 
   // ─── LAYOUT (Phaser canvas) ───────────────────────────────────
@@ -286,7 +295,7 @@ export class BoardGameScene extends Phaser.Scene {
     const overlays = [
       "RoleScene", "VotingScene", "NominationScene",
       "CharacterSelectionScene", "PolicyDescScene",
-      "DiscardPolicyScene", "PolicyEnactScene",
+      "DiscardPolicyScene", "PolicyEnactScene", "ContextScene",
     ];
     for (const name of overlays) {
       if (this.scene.isActive(name)) this.scene.stop(name);

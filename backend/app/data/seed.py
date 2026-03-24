@@ -104,6 +104,36 @@ def seed_database():
                     "Introduce a nationwide ban on social media access for users under 16 to protect young people from harmful online content, cyberbullying, and addictive platform design. The policy requires platforms to verify age and prevent under-16s from creating or maintaining accounts, ensuring a safer digital environment for children.",
                     None,
                 ),
+                (
+                    "Circular Economy and Waste Reduction Act",
+                    "sustainable",
+                    "Adopt a national circular economy strategy that reduces waste, promotes repair and reuse, and requires manufacturers to design products that last longer and can be recycled more easily. This supports responsible consumption and production by cutting landfill waste, reducing resource extraction, and encouraging sustainable business practices.",
+                    None,
+                ),
+                (
+                    "Climate Resilient Renewable Energy Transition",
+                    "sustainable",
+                    "Accelerate the transition to renewable energy by investing in solar, wind, and climate resilient infrastructure while phasing down fossil fuel dependence. This policy helps lower greenhouse gas emissions, strengthens energy security, and supports urgent action to address climate change and its long term impacts.",
+                    None,
+                ),
+                (
+                    "National Emissions Reduction and Adaptation Plan",
+                    "sustainable",
+                    "Implement a legally binding national plan to reduce emissions, expand public transit, restore ecosystems, and protect communities from climate related disasters such as floods, wildfires, and heat waves. This policy combines mitigation and adaptation to support strong climate action at both the national and local levels.",
+                    None,
+                ),
+                (
+                    "Anti-Corruption Governance Act",
+                    "sustainable",
+                    "Strengthen public institutions by requiring transparent government contracting, independent anti-corruption oversight, and open access to public spending data. This policy promotes accountability, reduces corruption, and helps build effective and trustworthy institutions that serve the public fairly.",
+                    None,
+                ),
+                (
+                    "Community Justice and Peacebuilding",
+                    "sustainable",
+                    "Expand access to justice through community legal support, conflict resolution programs, and protections for civil rights and public participation in decision making. This policy supports peaceful and inclusive societies by reducing inequality in legal access and helping communities resolve conflict without violence.",
+                    None,
+                ),
             ]
             cursor.executemany(
                 "INSERT INTO cards (card_name, card_type, card_detail, hover) VALUES (%s, %s, %s, %s)",

@@ -8,6 +8,7 @@ import { CharacterSelectionScene } from "./scenes/CharacterSelectionScene";
 import { PolicyDescScene } from "./scenes/PolicyDescScene";
 import { DiscardPolicyScene } from "./scenes/DiscardPolicyScene";
 import { PolicyEnactScene } from "./scenes/PolicyEnactScene";
+import { ContextScene } from "./scenes/ContextScene";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -23,7 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
         },
     },
     backgroundColor: "#0d1b2a",
-  scene: [MenuScene, BoardGameScene, RoleScene, VotingScene, NominationScene, CharacterSelectionScene, PolicyDescScene, DiscardPolicyScene, PolicyEnactScene],
+  scene: [MenuScene, BoardGameScene, RoleScene, VotingScene, NominationScene, CharacterSelectionScene, PolicyDescScene, DiscardPolicyScene, PolicyEnactScene, ContextScene],
 };
 
 new Phaser.Game(config);
