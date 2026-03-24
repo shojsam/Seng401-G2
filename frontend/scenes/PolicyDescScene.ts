@@ -121,19 +121,18 @@ export class PolicyDescScene extends Phaser.Scene {
     });
 
     // ── Left page — TITLE ───────────────────────────────────────────
-    // Left white area: ~5.5% to ~49% x, ~7% to ~93% y
     const leftPage = document.createElement("div");
     Object.assign(leftPage.style, {
       position: "absolute",
-      left: "2%",
-      top: "7%",
-      width: "43.5%",
-      height: "86%",
+      left: "3%",
+      top: "8%",
+      width: "42%",
+      height: "82%",
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
-      padding: "8% 6%",
+      padding: "6% 5%",
       boxSizing: "border-box",
       overflow: "hidden",
     });
@@ -155,33 +154,34 @@ export class PolicyDescScene extends Phaser.Scene {
 
     folder.appendChild(leftPage);
 
-    // ── Right page — DESCRIPTION ────────────────────────────────────
-    // Right white area: ~51% to ~95% x, ~5.5% to ~93% y
+    // ── Right page — DESCRIPTION (scrollable) ───────────────────────
     const rightPage = document.createElement("div");
+    rightPage.classList.add("policy-desc-right-page");
     Object.assign(rightPage.style, {
       position: "absolute",
-      left: "49%",
-      top: "5.5%",
-      width: "44%",
-      height: "87.5%",
+      left: "50%",
+      top: "8%",
+      width: "42%",
+      height: "82%",
       display: "flex",
       flexDirection: "column",
       alignItems: "flex-start",
       justifyContent: "flex-start",
-      padding: "8% 6%",
+      padding: "4% 4%",
       boxSizing: "border-box",
-      overflow: "hidden",
+      overflowY: "auto",
+      overflowX: "hidden",
     });
 
     const descEl = document.createElement("div");
     descEl.textContent = this.policyDescription;
     Object.assign(descEl.style, {
-      fontSize: "clamp(14px, 2.2vw, 26px)",
+      fontSize: "clamp(11px, 1.6vw, 20px)",
       fontWeight: "400",
       color: "#3a3228",
       fontFamily: '"Jersey 20", sans-serif',
       textAlign: "left",
-      lineHeight: "1.4",
+      lineHeight: "1.3",
       letterSpacing: "0.5px",
       wordBreak: "break-word",
     });
@@ -220,7 +220,6 @@ export class PolicyDescScene extends Phaser.Scene {
     });
     folder.appendChild(closeBtn);
 
-    // ── Hint at bottom ──────────────────────────────────────────────
     overlay.appendChild(folder);
 
     parent.appendChild(overlay);
@@ -236,6 +235,26 @@ export class PolicyDescScene extends Phaser.Scene {
       }
       #policy-desc-overlay button:hover {
         filter: brightness(1.2);
+      }
+      /* Themed scrollbar for the right page */
+      .policy-desc-right-page::-webkit-scrollbar {
+        width: 8px;
+      }
+      .policy-desc-right-page::-webkit-scrollbar-track {
+        background: rgba(58, 50, 40, 0.1);
+        border-radius: 4px;
+      }
+      .policy-desc-right-page::-webkit-scrollbar-thumb {
+        background: rgba(58, 50, 40, 0.35);
+        border-radius: 4px;
+      }
+      .policy-desc-right-page::-webkit-scrollbar-thumb:hover {
+        background: rgba(58, 50, 40, 0.55);
+      }
+      /* Firefox scrollbar */
+      .policy-desc-right-page {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(58, 50, 40, 0.35) rgba(58, 50, 40, 0.1);
       }
     `;
     document.head.appendChild(style);
