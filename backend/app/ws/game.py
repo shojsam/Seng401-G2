@@ -165,88 +165,6 @@ async def handle_role_acknowledged(lobby: LobbyState, username: str):
 
 
 # ------------------------------------------------------------------
-# Handler: character_selected
-# ------------------------------------------------------------------
-
-async def handle_character_selected(lobby: LobbyState, username: str, data: dict):
-    character_id = data.get("character_id", 0)
-    if not isinstance(character_id, int) or character_id <= 0:
-        return
-
-    # Store character selection on the lobby
-    if not hasattr(lobby, "character_selections"):
-        lobby.character_selections = {}  # type: ignore[attr-defined]
-    lobby.character_selections[username] = character_id  # type: ignore[attr-defined]
-
-    # Broadcast character update to all players
-    await broadcast(lobby, {
-        "type": "character_update",
-        "data": {
-            "lobby_code": lobby.code,
-            "username": username,
-            "character_id": character_id,
-        },
-    })
-
-    # Broadcast progress
-    total_selected = len(lobby.character_selections)  # type: ignore[attr-defined]
-    total_players = len(lobby.players)
-    await broadcast(lobby, {
-        "type": "character_progress",
-        "data": {
-            "lobby_code": lobby.code,
-            "selected": total_selected,
-            "total": total_players,
-            "message": f"Character selected: {total_selected}/{total_players} ready",
-        },
-    })
-
-    # Auto-start when 5+ players and all have chosen
-    if total_players >= 5 and total_selected >= total_players:
-        gs = lobby.game_state
-        if gs is None or gs.phase == Phase.GAME_OVER:
-            await _auto_start_game(lobby)
-
-
-async def _auto_start_game(lobby: LobbyState):
-    """Start the game automatically once all players have selected characters."""
-    lobby.ready_players.clear()
-    lobby.game_state = GameState(list(lobby.players))
-    gs = lobby.game_state
-    start_info = gs.start_game()
-
-    for pid in gs.player_ids:
-        role = start_info["roles"][pid]
-        private_msg: dict = {
-            "type": "game_started",
-            "data": {
-                "lobby_code": lobby.code,
-                "role": role,
-                "players": gs.player_ids,
-                "leader": start_info["leader"],
-            },
-        }
-        if role == "exploiter":
-            private_msg["data"]["exploiter_ids"] = start_info["exploiter_ids"]
-        await send_to_player(lobby, pid, private_msg)
-
-    await broadcast(lobby, {
-        "type": "phase_change",
-        "data": {
-            "lobby_code": lobby.code,
-            "phase": Phase.ROLE_REVEAL.value,
-            "leader": gs.leader,
-            "turn_index": gs.turn_index,
-        },
-    })
-
-    if not hasattr(lobby, "role_acks"):
-        lobby.role_acks = set()  # type: ignore[attr-defined]
-    else:
-        lobby.role_acks.clear()  # type: ignore[attr-defined]
-
-
-# ------------------------------------------------------------------
 # Internal helpers
 # ------------------------------------------------------------------
 
@@ -264,6 +182,7 @@ async def _broadcast_nomination_phase(lobby: LobbyState):
             "sustainable_count": gs.enacted_sustainable,
             "exploiter_count": gs.enacted_exploiter,
             "election_tracker": gs.election_tracker,
+            "ineligible_ids": gs.ineligible_for_vice,
             "message": f"It is {gs.leader}'s turn to nominate a Vice.",
         },
     })
@@ -597,6 +516,88 @@ async def handle_reset_game(lobby: LobbyState, _username: str):
             "message": "Game has been reset. Return to lobby.",
         },
     })
+
+
+# ------------------------------------------------------------------
+# Handler: character_selected
+# ------------------------------------------------------------------
+
+async def handle_character_selected(lobby: LobbyState, username: str, data: dict):
+    character_id = data.get("character_id", 0)
+    if not isinstance(character_id, int) or character_id <= 0:
+        return
+
+    # Store character selection on the lobby
+    if not hasattr(lobby, "character_selections"):
+        lobby.character_selections = {}  # type: ignore[attr-defined]
+    lobby.character_selections[username] = character_id  # type: ignore[attr-defined]
+
+    # Broadcast character update to all players
+    await broadcast(lobby, {
+        "type": "character_update",
+        "data": {
+            "lobby_code": lobby.code,
+            "username": username,
+            "character_id": character_id,
+        },
+    })
+
+    # Broadcast progress
+    total_selected = len(lobby.character_selections)  # type: ignore[attr-defined]
+    total_players = len(lobby.players)
+    await broadcast(lobby, {
+        "type": "character_progress",
+        "data": {
+            "lobby_code": lobby.code,
+            "selected": total_selected,
+            "total": total_players,
+            "message": f"Character selected: {total_selected}/{total_players} ready",
+        },
+    })
+
+    # Auto-start when 5+ players and all have chosen
+    if total_players >= 5 and total_selected >= total_players:
+        gs = lobby.game_state
+        if gs is None or gs.phase == Phase.GAME_OVER:
+            await _auto_start_game(lobby)
+
+
+async def _auto_start_game(lobby: LobbyState):
+    """Start the game automatically once all players have selected characters."""
+    lobby.ready_players.clear()
+    lobby.game_state = GameState(list(lobby.players))
+    gs = lobby.game_state
+    start_info = gs.start_game()
+
+    for pid in gs.player_ids:
+        role = start_info["roles"][pid]
+        private_msg: dict = {
+            "type": "game_started",
+            "data": {
+                "lobby_code": lobby.code,
+                "role": role,
+                "players": gs.player_ids,
+                "leader": start_info["leader"],
+            },
+        }
+        if role == "exploiter":
+            private_msg["data"]["exploiter_ids"] = start_info["exploiter_ids"]
+        await send_to_player(lobby, pid, private_msg)
+
+    await broadcast(lobby, {
+        "type": "phase_change",
+        "data": {
+            "lobby_code": lobby.code,
+            "phase": Phase.ROLE_REVEAL.value,
+            "leader": gs.leader,
+            "turn_index": gs.turn_index,
+        },
+    })
+
+    if not hasattr(lobby, "role_acks"):
+        lobby.role_acks = set()  # type: ignore[attr-defined]
+    else:
+        lobby.role_acks.clear()  # type: ignore[attr-defined]
 
 
 # ------------------------------------------------------------------

@@ -248,18 +248,22 @@ function onPhaseChange(
     // Nomination: show overlay for leader
     if (state.gamePhase === "nomination" && state.username === state.currentLeader) {
       const iAmExploiter = state.myRole === "exploiter";
+      const ineligibleIds: string[] = Array.isArray(data.ineligible_ids)
+        ? (data.ineligible_ids as string[])
+        : [];
       const candidates = state.players
         .filter((p) => p.name !== state.username)
         .map((p) => {
           const charId = p.characterId || state.playerCharacters[p.name] || 0;
           const playerIsExploiter = state.exploiterIds.includes(p.name);
+          const isEligible = !ineligibleIds.includes(p.name);
           let roleLabel = "";
           let roleColor = "";
           if (iAmExploiter && playerIsExploiter) {
             roleLabel = "EXPLOITER";
             roleColor = "#842929";
           }
-          return { name: p.name, eligible: true, characterId: charId, roleLabel, roleColor };
+          return { name: p.name, eligible: isEligible, characterId: charId, roleLabel, roleColor };
         });
 
       const nominationScene = scene.scene.get("NominationScene") as
@@ -484,6 +488,7 @@ function onGameOver(
   state.gamePhase = "game_over";
   updatePhaseBar(ui.getPhaseBarEl(), state);
 
+  const winner = String(data.winner ?? "reformers");
   const summary = data.summary as { roles?: Record<string, string> } | undefined;
   if (summary?.roles) {
     state.players.forEach((p) => {
@@ -493,8 +498,30 @@ function onGameOver(
 
   hideAllOverlays(scene);
   dismissAnnouncer();
-  announcePhase("game_over", state);
+
+  const announceDuration = announcePhase("game_over", state);
   ui.rebuildHUD();
+
+  // After the "GAME OVER" announcement finishes, transition to GameOverScene
+  const delay = Math.max(announceDuration, 500);
+  setTimeout(() => {
+    dismissAnnouncer();
+
+    // Build player info with revealed roles and character IDs
+    const players = state.players.map((p) => ({
+      name: p.name,
+      role: p.role || "?",
+      characterId: p.characterId || state.playerCharacters[p.name] || 0,
+    }));
+
+    // Transition to the full-screen GameOverScene
+    scene.scene.start("GameOverScene", {
+      winner,
+      players,
+      enactedSustainable: state.enactedSustainable,
+      enactedExploitative: state.enactedExploitative,
+    });
+  }, delay);
 }
 
 function onGameReset(

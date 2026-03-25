@@ -64,6 +64,10 @@ class GameState:
         self.enacted_policy: Optional[PolicyCard] = None
         self.election_tracker = 0
 
+        # Term limit tracking — prevents control loops
+        self.prev_leader: Optional[str] = None
+        self.prev_vice: Optional[str] = None
+
         # Scoring
         self.enacted_sustainable = 0
         self.enacted_exploiter = 0
@@ -78,6 +82,17 @@ class GameState:
     def leader(self) -> str:
         """The current round's leader (rotates each turn)."""
         return self.player_ids[self.turn_index % len(self.player_ids)]
+
+    @property
+    def ineligible_for_vice(self) -> list[str]:
+        """Players who cannot be nominated as Vice this round.
+        Includes: current leader, previous leader, and previous vice."""
+        ineligible = {self.leader}
+        if self.prev_leader is not None:
+            ineligible.add(self.prev_leader)
+        if self.prev_vice is not None:
+            ineligible.add(self.prev_vice)
+        return [pid for pid in ineligible if pid in self.player_ids]
 
     # ------------------------------------------------------------------
     # Game start
@@ -107,6 +122,11 @@ class GameState:
             raise ValueError("Leader cannot nominate themselves")
         if vice_id not in self.player_ids:
             raise ValueError("Vice must be a valid player")
+        # Term limit: cannot nominate the previous leader or previous vice
+        if vice_id == self.prev_leader:
+            raise ValueError("Cannot nominate the previous Leader (restricted)")
+        if vice_id == self.prev_vice:
+            raise ValueError("Cannot nominate the previous Vice (restricted)")
 
         self.nominated_vice = vice_id
         self.votes.clear()
@@ -241,6 +261,9 @@ class GameState:
         return self._resolve_enacted(forced)
 
     def _advance_turn(self):
+        # Save current leader/vice as previous before rotating
+        self.prev_leader = self.leader
+        self.prev_vice = self.nominated_vice
         self.turn_index += 1
         self.nominated_vice = None
         self.votes.clear()
@@ -286,4 +309,5 @@ class GameState:
             "sustainable_count": self.enacted_sustainable,
             "exploiter_count": self.enacted_exploiter,
             "election_tracker": self.election_tracker,
+            "ineligible_ids": self.ineligible_for_vice,
         }

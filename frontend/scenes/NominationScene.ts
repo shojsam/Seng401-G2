@@ -171,10 +171,10 @@ export class NominationScene extends Phaser.Scene {
         position: "relative",
       });
 
-      // Term-limited overlay text
+      // Restricted overlay text (previously "TERM LIMITED")
       if (!isEligible) {
         const limitedLabel = document.createElement("div");
-        limitedLabel.textContent = "TERM\nLIMITED";
+        limitedLabel.textContent = "RESTRICTED";
         Object.assign(limitedLabel.style, {
           position: "absolute",
           top: "50%",
