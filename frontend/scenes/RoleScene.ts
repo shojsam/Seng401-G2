@@ -33,25 +33,25 @@ const ROLE_DATA: Record<RoleType, RoleConfig> = {
     type: "reformer",
     label: "REFORMER",
     asset: "reformer_card",
-    accentColor: "#2b9d65",
+    accentColor: "#809671",
     winText:
-      "You win if the board fills with sustainable policies, or if the Exploiter-in-Chief is ousted.",
+      "You win if the board fills with sustainable policies.",
     loseText:
-      "You lose if the board fills with exploitative policies, or if the Exploiter-in-Chief becomes Director after 3 exploitative policies pass.",
+      "You lose if the board fills with exploitative policies",
     flavorText:
-      "Stay vigilant and watch for suspicious behaviour. Root out the Exploiter-in-Chief, and remember — anyone might be lying!",
+      "Stay vigilant and watch for suspicious behaviour. Remember — anyone might be lying!",
   },
   exploiter: {
     type: "exploiter",
     label: "EXPLOITER",
     asset: "exploiter_card",
-    accentColor: "#c0392b",
+    accentColor: "#842929",
     winText:
-      "You win if the board fills with exploitative policies, or if the Exploiter-in-Chief becomes Director after 3 exploitative policies pass.",
+      "You win if the board fills with exploitative policies",
     loseText:
-      "You lose if the board fills with sustainable policies, or if the Exploiter-in-Chief is ousted.",
+      "You lose if the board fills with sustainable policies",
     flavorText:
-      "Sow confusion, deflect suspicion, and push exploitative policies through. Trust no one — not even your allies!",
+      "Sow confusion, deflect suspicion, and push exploitative policies through!",
   },
 };
 
@@ -156,7 +156,6 @@ export class RoleScene extends Phaser.Scene {
       maxWidth: "680px",
       background: "#2a2e33",
       border: `4px solid ${role.accentColor}`,
-      borderRadius: "4px",
       padding: "36px 34px 32px",
       boxSizing: "border-box",
       boxShadow: "6px 6px 0 #000000",
@@ -276,7 +275,6 @@ export class RoleScene extends Phaser.Scene {
       marginTop: "28px",
       width: "200px",
       height: "64px",
-      borderRadius: "4px",
       border: `4px solid #bfa76a`,
       background: role.accentColor,
       color: "#f0ebe3",

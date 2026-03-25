@@ -67,4 +67,7 @@ export class GameState {
   // Next round ready progress — shown after policy enacted
   nextRoundProgress = "";
   nextRoundReady = false; // whether this player has pressed "Next Round"
+
+  // Election tracker — counts consecutive failed votes (0-3)
+  electionTracker = 0;
 }

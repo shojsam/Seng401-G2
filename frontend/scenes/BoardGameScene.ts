@@ -15,6 +15,7 @@ import { GameState } from "../game/GameState";
 import { createHUD, updatePhaseBar, TOTAL_HUD } from "../game/HUDBuilder";
 import { createPolicyHolders } from "../game/PolicyHolderBuilder";
 import { createDrawPile } from "../game/DrawPileBuilder";
+import { createElectionTracker } from "../game/ElectionTrackerBuilder";
 import { setupOverlayListeners, hideAllOverlays } from "../game/OverlayManager";
 import { connectWebSocket, syncLobbyState, type SocketUICallbacks } from "../game/GameSocketHandler";
 
@@ -36,6 +37,7 @@ export class BoardGameScene extends Phaser.Scene {
   private drawPileEl?: HTMLDivElement;
   private phaseBarEl?: HTMLDivElement;
   private nextRoundBtnEl?: HTMLDivElement;
+  private electionTrackerEl?: HTMLDivElement;
 
   // Phaser objects
   private bgImage?: Phaser.GameObjects.Image;
@@ -105,8 +107,8 @@ export class BoardGameScene extends Phaser.Scene {
 
   private uiCallbacks(): SocketUICallbacks {
     return {
-      rebuildHUD: () => this.rebuildHUD(),
-      rebuildPolicyHolders: () => { this.rebuildPolicyHolders(); this.rebuildNextRoundButton(); },
+      rebuildHUD: () => { this.rebuildHUD(); this.rebuildElectionTracker(); },
+      rebuildPolicyHolders: () => { this.rebuildPolicyHolders(); this.rebuildNextRoundButton(); this.rebuildElectionTracker(); },
       rebuildDrawPile: () => this.rebuildDrawPile(),
       updatePlayers: (names: string[]) => {
         // Preserve existing characterId data when updating player list
@@ -133,6 +135,7 @@ export class BoardGameScene extends Phaser.Scene {
     this.rebuildHUD();
     this.rebuildPolicyHolders();
     this.rebuildDrawPile();
+    this.rebuildElectionTracker();
     this.rebuildNextRoundButton();
   }
 
@@ -172,6 +175,19 @@ export class BoardGameScene extends Phaser.Scene {
     );
   }
 
+  private rebuildElectionTracker() {
+    if (this.electionTrackerEl) {
+      this.electionTrackerEl.remove();
+      this.electionTrackerEl = undefined;
+    }
+
+    this.electionTrackerEl = createElectionTracker(
+      this.state,
+      () => this.getBgAspect(),
+      (id, z) => this.createScaledWrapper(id, z),
+    );
+  }
+
   private rebuildNextRoundButton() {
     // Remove existing
     if (this.nextRoundBtnEl) {
@@ -204,7 +220,6 @@ export class BoardGameScene extends Phaser.Scene {
       height: "70px",
       background: this.state.nextRoundReady ? "#555" : "#4a7c3f",
       border: `4px solid ${this.state.nextRoundReady ? "#777" : "#6ba85e"}`,
-      borderRadius: "4px",
       color: "#e8e4dc",
       fontSize: "32px",
       fontFamily: '"Jersey 20", sans-serif',
@@ -365,7 +380,8 @@ export class BoardGameScene extends Phaser.Scene {
     this.holdersEl?.remove();
     this.drawPileEl?.remove();
     this.nextRoundBtnEl?.remove();
-    this.hudEl = this.holdersEl = this.drawPileEl = this.nextRoundBtnEl = undefined;
+    this.electionTrackerEl?.remove();
+    this.hudEl = this.holdersEl = this.drawPileEl = this.nextRoundBtnEl = this.electionTrackerEl = undefined;
 
     if (this.resizeHandler) {
       window.removeEventListener("resize", this.resizeHandler);

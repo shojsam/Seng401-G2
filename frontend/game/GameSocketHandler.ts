@@ -231,6 +231,9 @@ function onPhaseChange(
   if (data.exploiter_count !== undefined) {
     state.exploitativeCount = Number(data.exploiter_count);
   }
+  if (data.election_tracker !== undefined) {
+    state.electionTracker = Number(data.election_tracker);
+  }
 
   ui.rebuildPolicyHolders();
   ui.rebuildHUD();
@@ -334,6 +337,11 @@ function onElectionResult(
   // Store votes and result in state for HUD display
   state.playerVotes = votes;
   state.lastElectionApproved = approved;
+
+  // Update election tracker from server
+  if (data.election_tracker !== undefined) {
+    state.electionTracker = Number(data.election_tracker);
+  }
 
   // Enter the voting_results phase (client-side only)
   state.gamePhase = "voting_results";
@@ -512,6 +520,7 @@ function onGameReset(
   state.pendingViceHand = null;
   state.nextRoundProgress = "";
   state.nextRoundReady = false;
+  state.electionTracker = 0;
 
   hideAllOverlays(scene);
   dismissAnnouncer();
