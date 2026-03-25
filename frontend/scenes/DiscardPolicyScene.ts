@@ -104,7 +104,6 @@ export class DiscardPolicyScene extends Phaser.Scene {
     const panel = document.createElement("div");
     Object.assign(panel.style, {
       background: "#2a2e33",
-      borderRadius: "4px",
       border: "4px solid #4a4e55",
       padding: "36px 44px 40px",
       maxWidth: "750px",
@@ -202,7 +201,6 @@ export class DiscardPolicyScene extends Phaser.Scene {
         color: "#f0ebe3",
         background: "#842929",
         border: "4px solid #bc6262",
-        borderRadius: "4px",
         padding: "8px 24px",
         cursor: "pointer",
         boxShadow: "4px 4px 0 #3a1515",

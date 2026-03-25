@@ -201,7 +201,6 @@ export class PolicyDescScene extends Phaser.Scene {
       height: "40px",
       background: "#842929",
       border: "4px solid #bc6262",
-      borderRadius: "4px",
       color: "#e8e4dc",
       fontSize: "22px",
       fontFamily: '"Jersey 20", sans-serif',

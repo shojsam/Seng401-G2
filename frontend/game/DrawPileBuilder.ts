@@ -99,7 +99,6 @@ function buildDrawPile(count: number): HTMLDivElement {
       backgroundPosition: "center",
       backgroundRepeat: "no-repeat",
       imageRendering: "pixelated",
-      borderRadius: "4px",
       boxSizing: "border-box",
     });
     stackContainer.appendChild(card);
@@ -118,7 +117,6 @@ function buildDrawPile(count: number): HTMLDivElement {
     textAlign: "center",
     letterSpacing: "1px",
     background: "#3a2518",
-    borderRadius: "4px",
     padding: "2px 16px",
     minWidth: "40px",
     height: `${labelH}px`,

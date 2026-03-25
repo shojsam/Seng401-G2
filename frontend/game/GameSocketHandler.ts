@@ -485,15 +485,31 @@ function onGameOver(
   state: GameState,
   ui: SocketUICallbacks,
 ) {
+  // Cancel any active hold so game_over isn't blocked by round_result
+  cancelHold();
+
   state.gamePhase = "game_over";
   updatePhaseBar(ui.getPhaseBarEl(), state);
 
   const winner = String(data.winner ?? "reformers");
   const summary = data.summary as { roles?: Record<string, string> } | undefined;
+
+  // Server sends the authoritative player list and character selections
+  const serverPlayers = Array.isArray(data.players) ? (data.players as string[]) : [];
+  const serverChars = (data.character_selections ?? {}) as Record<string, number>;
+
+  // Update local state with server data
   if (summary?.roles) {
     state.players.forEach((p) => {
       p.role = summary.roles?.[p.name] ?? "?";
     });
+  }
+
+  // Merge server character selections into local state
+  for (const [name, charId] of Object.entries(serverChars)) {
+    state.playerCharacters[name] = Number(charId);
+    const p = state.players.find((pl) => pl.name === name);
+    if (p) p.characterId = Number(charId);
   }
 
   hideAllOverlays(scene);
@@ -507,12 +523,20 @@ function onGameOver(
   setTimeout(() => {
     dismissAnnouncer();
 
-    // Build player info with revealed roles and character IDs
-    const players = state.players.map((p) => ({
-      name: p.name,
-      role: p.role || "?",
-      characterId: p.characterId || state.playerCharacters[p.name] || 0,
-    }));
+    // Build player info from the server's authoritative player list
+    // Fall back to local state.players if server didn't send the list
+    const playerNames = serverPlayers.length > 0
+      ? serverPlayers
+      : state.players.map((p) => p.name);
+
+    const players = playerNames.map((name) => {
+      const localPlayer = state.players.find((p) => p.name === name);
+      return {
+        name,
+        role: summary?.roles?.[name] ?? localPlayer?.role ?? "?",
+        characterId: serverChars[name] ?? localPlayer?.characterId ?? state.playerCharacters[name] ?? 0,
+      };
+    });
 
     // Transition to the full-screen GameOverScene
     scene.scene.start("GameOverScene", {

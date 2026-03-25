@@ -309,7 +309,6 @@ export class MenuScene extends Phaser.Scene {
     Object.assign(panel.style, {
       background: "rgba(42, 46, 51, 0.92)",
       border: `4px solid ${borderColor}`,
-      borderRadius: "4px",
       padding: "26px 26px 28px",
       boxSizing: "border-box",
       boxShadow: "6px 6px 0 rgba(0,0,0,0.5)",
@@ -333,7 +332,6 @@ export class MenuScene extends Phaser.Scene {
       width: "100%",
       height: "4px",
       background: lineColor,
-      borderRadius: "0",
       marginBottom: "16px",
     });
 
@@ -380,7 +378,6 @@ export class MenuScene extends Phaser.Scene {
     Object.assign(input.style, {
       width: "100%",
       height: "62px",
-      borderRadius: "4px",
       border: "3px solid #6b6355",
       background: "#e8e5df",
       color: "#232323",
@@ -421,7 +418,6 @@ export class MenuScene extends Phaser.Scene {
     Object.assign(btn.style, {
       width: "100%",
       height: "74px",
-      borderRadius: "4px",
       border: `4px solid ${borderColor}`,
       background: bg,
       color: "#f0ebe3",

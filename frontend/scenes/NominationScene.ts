@@ -91,7 +91,6 @@ export class NominationScene extends Phaser.Scene {
     const panel = document.createElement("div");
     Object.assign(panel.style, {
       background: "#2a2e33",
-      borderRadius: "4px",
       border: "4px solid #4a4e55",
       padding: "36px 44px 40px",
       maxWidth: "750px",
@@ -269,7 +268,6 @@ export class NominationScene extends Phaser.Scene {
       color: "#f0ebe3",
       background: "#7a6a52",
       border: "4px solid #bfa76a",
-      borderRadius: "4px",
       padding: "12px 52px",
       cursor: "pointer",
       boxShadow: "4px 4px 0 #3a3228",

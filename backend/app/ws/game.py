@@ -615,12 +615,18 @@ async def _handle_game_over(lobby: LobbyState, winner: str):
         logger.warning("Failed to save game result: %s", exc)
 
     summary = gs.get_summary()
+
+    # Include character selections so every client has the full picture
+    char_selections = getattr(lobby, "character_selections", {})
+
     await broadcast(lobby, {
         "type": "game_over",
         "data": {
             "lobby_code": lobby.code,
             "winner": winner,
             "summary": summary,
+            "players": gs.player_ids,
+            "character_selections": char_selections,
             "message": (
                 "Reformers win! Sustainable policies prevailed."
                 if winner == "reformers"

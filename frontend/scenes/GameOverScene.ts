@@ -234,7 +234,7 @@ export class GameOverScene extends Phaser.Scene {
     Object.assign(menuBtn.style, {
       fontFamily: '"Jersey 20", sans-serif', fontSize: "36px", fontWeight: "400",
       letterSpacing: "3px", color: "#f0ebe3", background: "#7a6a52",
-      border: "4px solid #bfa76a", borderRadius: "4px", padding: "16px 56px",
+      border: "4px solid #bfa76a", padding: "16px 56px",
       cursor: "pointer", boxShadow: "4px 4px 0 #3a3228", transition: "none", imageRendering: "pixelated",
     });
     menuBtn.addEventListener("mousedown", () => { menuBtn.style.transform = "translateX(4px) translateY(4px)"; menuBtn.style.boxShadow = "0 0 0 #3a3228"; });
@@ -344,7 +344,7 @@ export class GameOverScene extends Phaser.Scene {
     holder.classList.add("go-holder");
     Object.assign(holder.style, {
       width: "480px", maxWidth: "90vw", background: bgColor,
-      border: `4px solid ${borderColor}`, borderRadius: "4px",
+      border: `4px solid ${borderColor}`,
       boxShadow: "4px 4px 0 rgba(0,0,0,0.5)", display: "flex",
       flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
       boxSizing: "border-box", padding: "16px 16px 20px", gap: "14px",
@@ -399,7 +399,7 @@ export class GameOverScene extends Phaser.Scene {
         ctxBtn.textContent = "?";
         Object.assign(ctxBtn.style, {
           width: "28px", height: "28px", background: "#4a6fa5",
-          border: "3px solid #6b8fc4", borderRadius: "4px", color: "#e8e4dc",
+          border: "3px solid #6b8fc4", color: "#e8e4dc",
           fontSize: "18px", fontFamily: '"Jersey 20", sans-serif', fontWeight: "400",
           cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
           padding: "0", lineHeight: "1", boxShadow: "2px 2px 0 rgba(0,0,0,0.3)", imageRendering: "pixelated",
