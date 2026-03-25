@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS games (
     game_id INT AUTO_INCREMENT PRIMARY KEY,
     game_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status ENUM('active', 'completed', 'cancelled') DEFAULT 'completed'
+    status ENUM('active', 'completed', 'cancelled') DEFAULT 'completed',
+    winner VARCHAR(50)
 );
 
 -- LOBBIES TABLE

@@ -10,16 +10,10 @@ def save_game_result(winner_name: str):
     connection = get_connection()
     cursor = connection.cursor()
     try:
-        if _table_exists(cursor, "game_results"):
+        if _table_exists(cursor, "games"):
             cursor.execute(
-                "INSERT INTO game_results (winner) VALUES (%s)",
-                (winner_name,),
-            )
-        elif _table_exists(cursor, "games"):
-            # Current schema stores completed games without a dedicated winner column.
-            cursor.execute(
-                "INSERT INTO games (status) VALUES (%s)",
-                ("completed",),
+                "INSERT INTO games (status, winner) VALUES (%s, %s)",
+                ("completed", winner_name),
             )
         else:
             raise RuntimeError("No compatible results table found")
@@ -40,17 +34,12 @@ def get_recent_results(limit=10):
     cursor = connection.cursor(dictionary=True)
 
     try:
-        if _table_exists(cursor, "game_results"):
-            cursor.execute(
-                "SELECT id, winner, played_at FROM game_results ORDER BY played_at DESC LIMIT %s",
-                (limit,),
-            )
-        elif _table_exists(cursor, "games"):
+        if _table_exists(cursor, "games"):
             cursor.execute(
                 """
                 SELECT
                     game_id AS id,
-                    NULL AS winner,
+                    winner,
                     game_date AS played_at
                 FROM games
                 ORDER BY game_date DESC
