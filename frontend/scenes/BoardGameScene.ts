@@ -35,6 +35,7 @@ export class BoardGameScene extends Phaser.Scene {
   private holdersEl?: HTMLDivElement;
   private drawPileEl?: HTMLDivElement;
   private phaseBarEl?: HTMLDivElement;
+  private nextRoundBtnEl?: HTMLDivElement;
 
   // Phaser objects
   private bgImage?: Phaser.GameObjects.Image;
@@ -105,7 +106,7 @@ export class BoardGameScene extends Phaser.Scene {
   private uiCallbacks(): SocketUICallbacks {
     return {
       rebuildHUD: () => this.rebuildHUD(),
-      rebuildPolicyHolders: () => this.rebuildPolicyHolders(),
+      rebuildPolicyHolders: () => { this.rebuildPolicyHolders(); this.rebuildNextRoundButton(); },
       rebuildDrawPile: () => this.rebuildDrawPile(),
       updatePlayers: (names: string[]) => {
         // Preserve existing characterId data when updating player list
@@ -132,6 +133,7 @@ export class BoardGameScene extends Phaser.Scene {
     this.rebuildHUD();
     this.rebuildPolicyHolders();
     this.rebuildDrawPile();
+    this.rebuildNextRoundButton();
   }
 
   private rebuildHUD() {
@@ -168,6 +170,83 @@ export class BoardGameScene extends Phaser.Scene {
       () => this.getBgAspect(),
       (id, z) => this.createScaledWrapper(id, z),
     );
+  }
+
+  private rebuildNextRoundButton() {
+    // Remove existing
+    if (this.nextRoundBtnEl) {
+      this.nextRoundBtnEl.remove();
+      this.nextRoundBtnEl = undefined;
+    }
+
+    // Only show during resolution phase
+    if (this.state.gamePhase !== "resolution") return;
+
+    const baseBgH = BASE_WIDTH * this.getBgAspect();
+    const holderW = BASE_WIDTH * 0.42;
+    const holderH = holderW * 0.65;
+    const holderY = TOTAL_HUD + baseBgH * 0.35 - holderH / 2;
+    const pileTop = holderY + holderH + 70;
+    const btnCenterX = BASE_WIDTH * 0.5;
+
+    const { wrapper, inner } = this.createScaledWrapper("next-round-btn-wrapper", "20");
+    // Keep wrapper as pointerEvents: none so it doesn't block policy holder clicks
+    // Only the button itself will capture clicks
+
+    const btn = document.createElement("button");
+    btn.textContent = this.state.nextRoundReady ? "WAITING..." : "NEXT ROUND";
+    btn.disabled = this.state.nextRoundReady;
+    Object.assign(btn.style, {
+      position: "absolute",
+      top: `${pileTop + 60}px`,
+      left: `${btnCenterX - 140}px`,
+      width: "280px",
+      height: "70px",
+      background: this.state.nextRoundReady ? "#555" : "#4a7c3f",
+      border: `4px solid ${this.state.nextRoundReady ? "#777" : "#6ba85e"}`,
+      borderRadius: "4px",
+      color: "#e8e4dc",
+      fontSize: "32px",
+      fontFamily: '"Jersey 20", sans-serif',
+      letterSpacing: "2px",
+      cursor: this.state.nextRoundReady ? "default" : "pointer",
+      boxShadow: "4px 4px 0 rgba(0,0,0,0.4)",
+      imageRendering: "pixelated",
+      pointerEvents: "auto",
+      opacity: this.state.nextRoundReady ? "0.6" : "1",
+    });
+
+    if (!this.state.nextRoundReady) {
+      btn.addEventListener("mousedown", () => {
+        btn.style.transform = "translateX(4px) translateY(4px)";
+        btn.style.boxShadow = "0 0 0 rgba(0,0,0,0.4)";
+      });
+      btn.addEventListener("mouseup", () => {
+        btn.style.transform = "translateX(0) translateY(0)";
+        btn.style.boxShadow = "4px 4px 0 rgba(0,0,0,0.4)";
+      });
+      btn.addEventListener("mouseleave", () => {
+        btn.style.transform = "translateX(0) translateY(0)";
+        btn.style.boxShadow = "4px 4px 0 rgba(0,0,0,0.4)";
+      });
+      btn.addEventListener("mouseenter", () => {
+        btn.style.filter = "brightness(1.12)";
+      });
+      btn.addEventListener("mouseleave", () => {
+        btn.style.filter = "none";
+      });
+
+      btn.addEventListener("click", () => {
+        this.state.nextRoundReady = true;
+        this.sendMessage("next_round_ready");
+        this.rebuildNextRoundButton();
+      });
+    }
+
+    inner.appendChild(btn);
+    const parent = document.getElementById("game-container") ?? document.body;
+    parent.appendChild(wrapper);
+    this.nextRoundBtnEl = wrapper;
   }
 
   // ─── OVERLAY SCENE LAUNCHES ───────────────────────────────────
@@ -285,7 +364,8 @@ export class BoardGameScene extends Phaser.Scene {
     this.hudEl?.remove();
     this.holdersEl?.remove();
     this.drawPileEl?.remove();
-    this.hudEl = this.holdersEl = this.drawPileEl = undefined;
+    this.nextRoundBtnEl?.remove();
+    this.hudEl = this.holdersEl = this.drawPileEl = this.nextRoundBtnEl = undefined;
 
     if (this.resizeHandler) {
       window.removeEventListener("resize", this.resizeHandler);

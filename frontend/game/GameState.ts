@@ -63,4 +63,8 @@ export class GameState {
   // before the phase announcement finishes, so it can be re-shown after
   pendingLeaderHand: { title: string; description: string }[] | null = null;
   pendingViceHand: { title: string; description: string }[] | null = null;
+
+  // Next round ready progress — shown after policy enacted
+  nextRoundProgress = "";
+  nextRoundReady = false; // whether this player has pressed "Next Round"
 }

@@ -171,6 +171,9 @@ function handleSocketMessage(
     case "character_progress":
       onCharacterProgress(data ?? {}, state, ui);
       break;
+    case "next_round_progress":
+      onNextRoundProgress(data ?? {}, state, ui);
+      break;
     case "player_disconnected":
     case "error":
       break;
@@ -215,6 +218,10 @@ function onPhaseChange(
   state.gamePhase = String(data.phase ?? "");
   if (data.leader) state.currentLeader = String(data.leader);
   if (data.nominated_vice) state.currentVice = String(data.nominated_vice);
+
+  // Reset next round state when moving to a new phase
+  state.nextRoundReady = false;
+  state.nextRoundProgress = "";
 
   updatePhaseBar(ui.getPhaseBarEl(), state);
 
@@ -436,6 +443,11 @@ function onRoundResult(
   }
 
   hideAllOverlays(scene);
+
+  // Set phase to "resolution" so the Next Round button appears
+  state.gamePhase = "resolution";
+  updatePhaseBar(ui.getPhaseBarEl(), state);
+
   ui.rebuildPolicyHolders();
   ui.rebuildDrawPile();
 
@@ -446,10 +458,6 @@ function onRoundResult(
     : policyType === "exploitative"
       ? `${policyTitle} — An exploitative policy was enacted.`
       : `${policyTitle} has been enacted.`;
-
-  // Temporarily set phase to "resolution" so the announcer picks it up
-  state.gamePhase = "resolution";
-  updatePhaseBar(ui.getPhaseBarEl(), state);
 
   const announceDuration = announcePhase("resolution", state, subtitle);
   if (announceDuration > 0) {
@@ -502,6 +510,8 @@ function onGameReset(
   state.lastElectionApproved = null;
   state.pendingLeaderHand = null;
   state.pendingViceHand = null;
+  state.nextRoundProgress = "";
+  state.nextRoundReady = false;
 
   hideAllOverlays(scene);
   dismissAnnouncer();
@@ -533,5 +543,16 @@ function onCharacterProgress(
   const selected = Number(data.selected ?? 0);
   const total = Number(data.total ?? 0);
   state.characterProgress = `${selected}/${total} players ready`;
+  updatePhaseBar(ui.getPhaseBarEl(), state);
+}
+
+function onNextRoundProgress(
+  data: Record<string, unknown>,
+  state: GameState,
+  ui: SocketUICallbacks,
+) {
+  const ready = Number(data.ready ?? 0);
+  const total = Number(data.total ?? 0);
+  state.nextRoundProgress = `${ready}/${total} PLAYERS READY`;
   updatePhaseBar(ui.getPhaseBarEl(), state);
 }

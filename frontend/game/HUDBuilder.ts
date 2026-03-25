@@ -157,6 +157,7 @@ function buildPlayerCard(player: PlayerData, state: GameState): HTMLDivElement {
         fontFamily: '"Jersey 20", sans-serif',
         letterSpacing: "1px",
         padding: "2px 8px",
+        borderRadius: "2px",
         boxShadow: "2px 2px 0 rgba(0,0,0,0.4)",
         zIndex: "10",
         lineHeight: "1.2",
@@ -264,7 +265,9 @@ export function getPhaseDisplayText(state: GameState): string {
         ? "Your turn — Enact a policy"
         : `${state.currentVice || "Vice"} is choosing a policy to enact...`;
     case "resolution":
-      return "Policy enacted!";
+      return state.nextRoundProgress
+        ? `Policy enacted! — ${state.nextRoundProgress}`
+        : "Policy enacted! — Press Next Round to continue";
     case "game_over":
       return "Game Over";
     default:
