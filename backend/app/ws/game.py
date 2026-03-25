@@ -107,6 +107,7 @@ async def handle_start_game(lobby: LobbyState, username: str):
                 "role": role,
                 "players": gs.player_ids,
                 "leader": start_info["leader"],
+                "draw_pile_remaining": len(gs.draw_pile),
             },
         }
         if role == "exploiter":
@@ -348,6 +349,7 @@ async def _resolve_election(lobby: LobbyState):
                     "enacted_policy": forced["enacted_policy"],
                     "sustainable_count": forced["sustainable_count"],
                     "exploiter_count": forced["exploiter_count"],
+                    "draw_pile_remaining": len(gs.draw_pile),
                     "message": "3 failed elections! A policy was enacted automatically.",
                 },
             })
@@ -453,6 +455,7 @@ async def handle_vice_enact(lobby: LobbyState, username: str, data: dict):
             "enacted_policy": result["enacted_policy"],
             "sustainable_count": result["sustainable_count"],
             "exploiter_count": result["exploiter_count"],
+            "draw_pile_remaining": len(gs.draw_pile),
             "message": f"Policy enacted: {result['enacted_policy']['title']} ({result['enacted_policy']['policy_type']})",
         },
     })
@@ -578,6 +581,7 @@ async def _auto_start_game(lobby: LobbyState):
                 "role": role,
                 "players": gs.player_ids,
                 "leader": start_info["leader"],
+                "draw_pile_remaining": len(gs.draw_pile),
             },
         }
         if role == "exploiter":

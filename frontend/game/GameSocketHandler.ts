@@ -195,6 +195,9 @@ function onGameStarted(
   state.exploiterIds = Array.isArray(data.exploiter_ids)
     ? (data.exploiter_ids as string[])
     : [];
+  if (data.draw_pile_remaining != null) {
+    state.policyDrawCount = Number(data.draw_pile_remaining);
+  }
   state.gamePhase = "role_reveal";
   updatePhaseBar(ui.getPhaseBarEl(), state);
 
@@ -430,7 +433,9 @@ function onRoundResult(
 ) {
   state.sustainableCount = Number(data.sustainable_count ?? state.sustainableCount);
   state.exploitativeCount = Number(data.exploiter_count ?? state.exploitativeCount);
-  state.policyDrawCount = Math.max(0, state.policyDrawCount - 1);
+  if (data.draw_pile_remaining != null) {
+    state.policyDrawCount = Number(data.draw_pile_remaining);
+  }
 
   // Store the enacted policy for display in the holder slots
   const enacted = data.enacted_policy as {
@@ -564,7 +569,7 @@ function onGameReset(
   state.exploiterIds = [];
   state.sustainableCount = 0;
   state.exploitativeCount = 0;
-  state.policyDrawCount = 17;
+  state.policyDrawCount = 0;
   state.enactedSustainable = [];
   state.enactedExploitative = [];
   state.playerVotes = {};

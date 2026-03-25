@@ -38,7 +38,7 @@ export class GameState {
 
   sustainableCount = 0;
   exploitativeCount = 0;
-  policyDrawCount = 20;
+  policyDrawCount = 0;
 
   myRole = "";
   currentLeader = "";
