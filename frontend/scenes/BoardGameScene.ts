@@ -54,6 +54,7 @@ export class BoardGameScene extends Phaser.Scene {
   }
 
   create() {
+    this.state = new GameState();
     const data = (this.scene.settings.data as { username?: string; lobbyCode?: string } | undefined) ?? {};
     this.state.username = (data.username ?? "").trim();
     this.state.lobbyCode = (data.lobbyCode ?? "").trim().toUpperCase();
