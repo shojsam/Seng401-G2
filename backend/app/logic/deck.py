@@ -14,16 +14,18 @@ class PolicyType(str, Enum):
 
 
 class PolicyCard:
-    def __init__(self, policy_type: PolicyType, title: str = "", description: str = ""):
+    def __init__(self, policy_type: PolicyType, title: str = "", description: str = "", hover: str = ""):
         self.policy_type = policy_type
         self.title = title
         self.description = description
+        self.hover = hover
 
     def to_dict(self) -> dict:
         return {
             "policy_type": self.policy_type.value,
             "title": self.title,
             "description": self.description,
+            "hover": self.hover,
         }
 
 
@@ -55,8 +57,9 @@ def _load_cards_from_db() -> list[PolicyCard] | None:
 
             title = str(row.get("card_name", "Policy"))
             description = str(row.get("card_detail", "") or "")
+            hover = str(row.get("hover", "") or "")
 
-            deck.append(PolicyCard(policy_type, title=title, description=description))
+            deck.append(PolicyCard(policy_type, title=title, description=description, hover=hover))
 
         if deck:
             return deck

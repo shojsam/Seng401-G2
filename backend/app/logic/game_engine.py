@@ -36,7 +36,7 @@ class Phase(str, Enum):
 
 # Win conditions
 SUSTAINABLE_WIN_COUNT = 5
-EXPLOITER_WIN_COUNT = 4
+EXPLOITER_WIN_COUNT = 3
 
 # Card counts
 LEADER_DRAW_COUNT = 3

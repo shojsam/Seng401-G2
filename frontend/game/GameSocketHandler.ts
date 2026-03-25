@@ -426,13 +426,14 @@ function onRoundResult(
 ) {
   state.sustainableCount = Number(data.sustainable_count ?? state.sustainableCount);
   state.exploitativeCount = Number(data.exploiter_count ?? state.exploitativeCount);
-  state.policyDrawCount = Math.max(0, state.policyDrawCount - 3);
+  state.policyDrawCount = Math.max(0, state.policyDrawCount - 1);
 
   // Store the enacted policy for display in the holder slots
   const enacted = data.enacted_policy as {
     title?: string;
     description?: string;
     policy_type?: string;
+    hover?: string;
   } | undefined;
 
   let policyTitle = "Policy";
@@ -442,6 +443,7 @@ function onRoundResult(
       title: policyTitle,
       description: String(enacted.description ?? ""),
       policy_type: enacted.policy_type as "sustainable" | "exploitative",
+      hover: String(enacted.hover ?? ""),
     };
     if (policy.policy_type === "sustainable") {
       state.enactedSustainable.push(policy);

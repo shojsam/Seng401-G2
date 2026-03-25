@@ -161,7 +161,10 @@ export class BoardGameScene extends Phaser.Scene {
         const contextScene = this.scene.get("ContextScene") as
           { show: (d: { title: string; context: string }) => void } | undefined;
         if (contextScene) {
-          contextScene.show({ title: policy.title, context: "Context content coming soon." });
+          contextScene.show({
+            title: policy.title,
+            context: policy.hover || "No context available for this policy yet.",
+          });
         }
       },
     );
@@ -220,6 +223,7 @@ export class BoardGameScene extends Phaser.Scene {
       height: "70px",
       background: this.state.nextRoundReady ? "#555" : "#4a7c3f",
       border: `4px solid ${this.state.nextRoundReady ? "#777" : "#6ba85e"}`,
+      borderRadius: "4px",
       color: "#e8e4dc",
       fontSize: "32px",
       fontFamily: '"Jersey 20", sans-serif',

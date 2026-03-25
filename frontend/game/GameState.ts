@@ -24,6 +24,7 @@ export interface EnactedPolicy {
   title: string;
   description: string;
   policy_type: "sustainable" | "exploitative";
+  hover: string;
 }
 
 /**
