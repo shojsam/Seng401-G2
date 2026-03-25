@@ -8,7 +8,7 @@ from .ws import game
 from .data import repository
 
 
-app = FastAPI(title="GreenWatch", version="0.1.0")
+app = FastAPI(title="Greenwashed", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
