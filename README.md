@@ -161,8 +161,7 @@ The game is deployed on [Railway](https://railway.app):
 - **Frontend:** Node container serving Vite build
 - **Database:** Railway-managed MySQL instance
 
-Live URL: [https://seng401-g2-production.up.railway.app](https://seng401-g2-production.up.railway.app)
-
+Live URL: [https:
 ## Team — Group 02
 
 ## License
