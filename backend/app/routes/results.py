@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from data.models import get_recent_results
+from ..data.models import get_recent_results
 
 router = APIRouter()
 

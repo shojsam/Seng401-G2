@@ -1,272 +1,404 @@
-import Phaser from "phaser";
-
 /**
- * Asset keys and paths — place images in your public/assets folder:
+ * scenes/BoardGameScene.ts — Main game scene (orchestrator).
  *
- *   board_bg.png          → UN courtroom background
- *   card_sustainable.png  → Blue "SUSTAINABLE" card holder (transparent bg)
- *   card_exploitative.png → Red "EXPLOITATIVE" card holder (transparent bg)
+ * Delegates to:
+ *   game/GameState.ts            — shared state
+ *   game/HudBuilder.ts           — HUD + phase bar
+ *   game/PolicyHolderBuilder.ts  — policy holder panels
+ *   game/DrawPileBuilder.ts      — draw pile display
+ *   game/OverlayManager.ts       — overlay event wiring
+ *   game/GameSocketHandler.ts    — WebSocket + message handlers
  */
+import Phaser from "phaser";
+import { createGameSocket, getLobbyPlayers, leaveLobby } from "../src/api";
+import { GameState } from "../game/GameState";
+import { createHUD, updatePhaseBar, TOTAL_HUD } from "../game/HUDBuilder";
+import { createPolicyHolders } from "../game/PolicyHolderBuilder";
+import { createDrawPile } from "../game/DrawPileBuilder";
+import { createElectionTracker } from "../game/ElectionTrackerBuilder";
+import { setupOverlayListeners, hideAllOverlays } from "../game/OverlayManager";
+import { connectWebSocket, syncLobbyState, type SocketUICallbacks } from "../game/GameSocketHandler";
 
 const ASSETS = {
   board_bg: "assets/board_bg.png",
-  card_sustainable: "assets/card_sustainable.png",
-  card_exploitative: "assets/card_exploitative.png",
+  player_basecard: "assets/player_basecard.png",
 };
 
-const HUD_HEIGHT = 250;
-const BORDER_HEIGHT = 3;
-const TOTAL_HUD = HUD_HEIGHT + BORDER_HEIGHT;
-
-/** Placeholder player data — replace with real game state later */
-interface PlayerData {
-  name: string;
-  role?: string;
-  isActive?: boolean;
-  isEliminated?: boolean;
-}
+const BASE_WIDTH = 1920;
 
 export class BoardGameScene extends Phaser.Scene {
-  private players: PlayerData[] = [];
-  private hudEl?: HTMLDivElement;
-  private sustainableHolder!: Phaser.GameObjects.Image;
-  private exploitativeHolder!: Phaser.GameObjects.Image;
-
-  // Track policy counts for the card holders
-  private sustainableCount: number = 0;
-  private exploitativeCount: number = 0;
-
-  // Track resize listener so we can clean it up
+  private state = new GameState();
+  private socket?: WebSocket;
   private resizeHandler?: () => void;
+
+  // DOM element references
+  private hudEl?: HTMLDivElement;
+  private holdersEl?: HTMLDivElement;
+  private drawPileEl?: HTMLDivElement;
+  private phaseBarEl?: HTMLDivElement;
+  private nextRoundBtnEl?: HTMLDivElement;
+  private electionTrackerEl?: HTMLDivElement;
+
+  // Phaser objects
+  private bgImage?: Phaser.GameObjects.Image;
+  private dimOverlay?: Phaser.GameObjects.Rectangle;
+  private hudBgFill?: Phaser.GameObjects.Rectangle;
 
   constructor() {
     super({ key: "BoardGameScene" });
   }
 
-  // ─── PRELOAD ──────────────────────────────────────────────────────
-
   preload() {
     this.load.image("board_bg", ASSETS.board_bg);
-    this.load.image("card_sustainable", ASSETS.card_sustainable);
-    this.load.image("card_exploitative", ASSETS.card_exploitative);
+    this.load.image("player_basecard", ASSETS.player_basecard);
   }
 
-  // ─── CREATE ───────────────────────────────────────────────────────
-
   create() {
-    // Enable native browser scrolling (MenuScene uses it too)
+    this.state = new GameState();
+    const data = (this.scene.settings.data as { username?: string; lobbyCode?: string } | undefined) ?? {};
+    this.state.username = (data.username ?? "").trim();
+    this.state.lobbyCode = (data.lobbyCode ?? "").trim().toUpperCase();
+
     document.body.style.overflowX = "hidden";
     document.body.style.overflowY = "auto";
     document.documentElement.style.overflowX = "hidden";
     document.documentElement.style.overflowY = "auto";
 
-    // ── Placeholder players (replace with lobby data) ─────────────
-    this.players = [
-      { name: "Player 1" },
-      { name: "Player 2" },
-      { name: "Player 3" },
-      { name: "Player 4" },
-      { name: "Player 5" },
-      { name: "Player 6" },
-    ];
+    this.state.players = this.state.username ? [{ name: this.state.username }] : [];
 
-    // ── Layout everything ─────────────────────────────────────────
-    this.layoutScene();
-    this.createHUD();
+    this.rebuildAll();
 
-    // ── Handle window resize ──────────────────────────────────────
-    this.resizeHandler = () => this.layoutScene();
+    this.resizeHandler = () => this.rebuildAll();
     window.addEventListener("resize", this.resizeHandler);
 
     this.events.on("shutdown", this.cleanup, this);
     this.events.on("destroy", this.cleanup, this);
+
+    // Launch overlay scenes
+    this.launchOverlayScenes();
+
+    // Wire overlay events → WebSocket
+    setupOverlayListeners(this, this.state, (type, data) => this.sendMessage(type, data));
+
+    // After overlay listeners are set up, trigger HUD rebuild so character selection works
+    const charScene = this.scene.get("CharacterSelectionScene");
+    if (charScene) {
+      charScene.events.on("character-selected", () => this.rebuildHUD());
+    }
+
+    // Network
+    void syncLobbyState(this.state, this.uiCallbacks());
+    this.socket = connectWebSocket(this, this.state, (t, d) => this.sendMessage(t, d), this.uiCallbacks());
+
+    this.socket.addEventListener("open", () => {});
+    this.socket.addEventListener("close", () => {});
+    this.socket.addEventListener("error", () => {});
+
+    // Auto-show character selection
+    this.time.delayedCall(500, () => {
+      if (this.state.myCharacterId === 0) {
+        const cs = this.scene.get("CharacterSelectionScene") as
+          { show: (d: { username: string }) => void } | undefined;
+        if (cs) cs.show({ username: this.state.username });
+      }
+    });
   }
 
-  // ─── LAYOUT (canvas-based content) ────────────────────────────────
+  // ─── UI CALLBACKS (bridge for GameSocketHandler) ──────────────
+
+  private uiCallbacks(): SocketUICallbacks {
+    return {
+      rebuildHUD: () => { this.rebuildHUD(); this.rebuildElectionTracker(); },
+      rebuildPolicyHolders: () => { this.rebuildPolicyHolders(); this.rebuildNextRoundButton(); this.rebuildElectionTracker(); },
+      rebuildDrawPile: () => this.rebuildDrawPile(),
+      updatePlayers: (names: string[]) => {
+        // Preserve existing characterId data when updating player list
+        const existing = new Map(this.state.players.map((p) => [p.name, p]));
+        this.state.players = names.map((name) => existing.get(name) ?? { name });
+        this.rebuildHUD();
+      },
+      getPhaseBarEl: () => this.phaseBarEl,
+    };
+  }
+
+  // ─── SEND MESSAGE ─────────────────────────────────────────────
+
+  private sendMessage(type: string, data: Record<string, unknown> = {}) {
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({ type, data }));
+    }
+  }
+
+  // ─── REBUILD HELPERS ──────────────────────────────────────────
+
+  private rebuildAll() {
+    this.layoutScene();
+    this.rebuildHUD();
+    this.rebuildPolicyHolders();
+    this.rebuildDrawPile();
+    this.rebuildElectionTracker();
+    this.rebuildNextRoundButton();
+  }
+
+  private rebuildHUD() {
+    const result = createHUD(this.state, BASE_WIDTH, (id, z) => this.createScaledWrapper(id, z));
+    this.hudEl = result.hudWrapper;
+    this.phaseBarEl = result.phaseBarEl;
+  }
+
+  private rebuildPolicyHolders() {
+    this.holdersEl = createPolicyHolders(
+      this.state,
+      () => this.getBgAspect(),
+      (id, z) => this.createScaledWrapper(id, z),
+      (policy) => {
+        const policyDescScene = this.scene.get("PolicyDescScene") as
+          { show: (d: { title: string; description: string }) => void } | undefined;
+        if (policyDescScene) {
+          policyDescScene.show({ title: policy.title, description: policy.description });
+        }
+      },
+      (policy) => {
+        const contextScene = this.scene.get("ContextScene") as
+          { show: (d: { title: string; context: string }) => void } | undefined;
+        if (contextScene) {
+          contextScene.show({
+            title: policy.title,
+            context: policy.hover || "No context available for this policy yet.",
+          });
+        }
+      },
+    );
+  }
+
+  private rebuildDrawPile() {
+    this.drawPileEl = createDrawPile(
+      this.state.policyDrawCount,
+      () => this.getBgAspect(),
+      (id, z) => this.createScaledWrapper(id, z),
+    );
+  }
+
+  private rebuildElectionTracker() {
+    if (this.electionTrackerEl) {
+      this.electionTrackerEl.remove();
+      this.electionTrackerEl = undefined;
+    }
+
+    this.electionTrackerEl = createElectionTracker(
+      this.state,
+      () => this.getBgAspect(),
+      (id, z) => this.createScaledWrapper(id, z),
+    );
+  }
+
+  private rebuildNextRoundButton() {
+    // Remove existing
+    if (this.nextRoundBtnEl) {
+      this.nextRoundBtnEl.remove();
+      this.nextRoundBtnEl = undefined;
+    }
+
+    // Only show during resolution phase
+    if (this.state.gamePhase !== "resolution") return;
+
+    const baseBgH = BASE_WIDTH * this.getBgAspect();
+    const holderW = BASE_WIDTH * 0.42;
+    const holderH = holderW * 0.65;
+    const holderY = TOTAL_HUD + baseBgH * 0.35 - holderH / 2;
+    const pileTop = holderY + holderH + 70;
+    const btnCenterX = BASE_WIDTH * 0.5;
+
+    const { wrapper, inner } = this.createScaledWrapper("next-round-btn-wrapper", "20");
+    // Keep wrapper as pointerEvents: none so it doesn't block policy holder clicks
+    // Only the button itself will capture clicks
+
+    const btn = document.createElement("button");
+    btn.textContent = this.state.nextRoundReady ? "WAITING..." : "NEXT ROUND";
+    btn.disabled = this.state.nextRoundReady;
+    Object.assign(btn.style, {
+      position: "absolute",
+      top: `${pileTop + 60}px`,
+      left: `${btnCenterX - 140}px`,
+      width: "280px",
+      height: "70px",
+      background: this.state.nextRoundReady ? "#555" : "#4a7c3f",
+      border: `4px solid ${this.state.nextRoundReady ? "#777" : "#6ba85e"}`,
+      color: "#e8e4dc",
+      fontSize: "32px",
+      fontFamily: '"Jersey 20", sans-serif',
+      letterSpacing: "2px",
+      cursor: this.state.nextRoundReady ? "default" : "pointer",
+      boxShadow: "4px 4px 0 rgba(0,0,0,0.4)",
+      imageRendering: "pixelated",
+      pointerEvents: "auto",
+      opacity: this.state.nextRoundReady ? "0.6" : "1",
+    });
+
+    if (!this.state.nextRoundReady) {
+      btn.addEventListener("mousedown", () => {
+        btn.style.transform = "translateX(4px) translateY(4px)";
+        btn.style.boxShadow = "0 0 0 rgba(0,0,0,0.4)";
+      });
+      btn.addEventListener("mouseup", () => {
+        btn.style.transform = "translateX(0) translateY(0)";
+        btn.style.boxShadow = "4px 4px 0 rgba(0,0,0,0.4)";
+      });
+      btn.addEventListener("mouseleave", () => {
+        btn.style.transform = "translateX(0) translateY(0)";
+        btn.style.boxShadow = "4px 4px 0 rgba(0,0,0,0.4)";
+      });
+      btn.addEventListener("mouseenter", () => {
+        btn.style.filter = "brightness(1.12)";
+      });
+      btn.addEventListener("mouseleave", () => {
+        btn.style.filter = "none";
+      });
+
+      btn.addEventListener("click", () => {
+        this.state.nextRoundReady = true;
+        this.sendMessage("next_round_ready");
+        this.rebuildNextRoundButton();
+      });
+    }
+
+    inner.appendChild(btn);
+    const parent = document.getElementById("game-container") ?? document.body;
+    parent.appendChild(wrapper);
+    this.nextRoundBtnEl = wrapper;
+  }
+
+  // ─── OVERLAY SCENE LAUNCHES ───────────────────────────────────
+
+  private launchOverlayScenes() {
+    if (!this.scene.isActive("RoleScene"))
+      this.scene.launch("RoleScene", { role: "reformer" });
+    if (!this.scene.isActive("VotingScene"))
+      this.scene.launch("VotingScene", { nominatorName: "", nomineeName: "" });
+    if (!this.scene.isActive("NominationScene"))
+      this.scene.launch("NominationScene", { players: [] });
+    if (!this.scene.isActive("CharacterSelectionScene"))
+      this.scene.launch("CharacterSelectionScene", { username: this.state.username });
+    if (!this.scene.isActive("PolicyDescScene"))
+      this.scene.launch("PolicyDescScene", { title: "", description: "" });
+    if (!this.scene.isActive("DiscardPolicyScene"))
+      this.scene.launch("DiscardPolicyScene");
+    if (!this.scene.isActive("PolicyEnactScene"))
+      this.scene.launch("PolicyEnactScene");
+    if (!this.scene.isActive("ContextScene"))
+      this.scene.launch("ContextScene", { title: "", context: "" });
+  }
+
+  // ─── LAYOUT (Phaser canvas) ───────────────────────────────────
+
+  private getScale(): number {
+    return window.innerWidth / BASE_WIDTH;
+  }
+
+  private getBgAspect(): number {
+    const bgTex = this.textures.get("board_bg").getSourceImage();
+    return bgTex.height / bgTex.width;
+  }
+
+  private createScaledWrapper(id: string, zIndex: string): { wrapper: HTMLDivElement; inner: HTMLDivElement } {
+    const s = this.getScale();
+    const canvasH = this.game.canvas.style.height || `${window.innerHeight}px`;
+
+    const wrapper = document.createElement("div");
+    wrapper.id = id;
+    Object.assign(wrapper.style, {
+      position: "absolute", top: "0", left: "0",
+      width: `${window.innerWidth}px`, height: canvasH,
+      overflow: "hidden", zIndex, pointerEvents: "none",
+    });
+
+    const inner = document.createElement("div");
+    Object.assign(inner.style, {
+      position: "absolute", top: "0", left: "0",
+      width: `${BASE_WIDTH}px`,
+      transformOrigin: "top left",
+      transform: `scale(${s})`,
+    });
+
+    wrapper.appendChild(inner);
+    return { wrapper, inner };
+  }
 
   private layoutScene() {
-    const width = window.innerWidth;
+    const s = this.getScale();
+    const baseBgH = BASE_WIDTH * this.getBgAspect();
+    const totalBaseH = TOTAL_HUD + baseBgH;
+    const totalCssH = Math.max(totalBaseH * s, window.innerHeight);
 
-    // Calculate background height from its natural aspect ratio
-    const bgTex = this.textures.get("board_bg").getSourceImage();
-    const bgAspect = bgTex.height / bgTex.width;
-    const bgDisplayH = width * bgAspect;
+    this.scale.resize(BASE_WIDTH, totalBaseH);
 
-    // Total canvas height = HUD space + background at natural aspect ratio
-    const totalH = Math.max(TOTAL_HUD + bgDisplayH, window.innerHeight);
+    const canvas = this.game.canvas;
+    canvas.style.width = `${window.innerWidth}px`;
+    canvas.style.height = `${totalCssH}px`;
+    canvas.style.pointerEvents = "none"; // Let DOM elements receive clicks
 
-    // Resize the Phaser game canvas to fit all content
-    this.scale.resize(width, totalH);
+    const container = document.getElementById("game-container");
+    if (container) {
+      container.style.width = `${window.innerWidth}px`;
+      container.style.height = `${totalCssH}px`;
+    }
 
-    // Also explicitly size the canvas element so the page is scrollable
-    this.game.canvas.style.width = `${width}px`;
-    this.game.canvas.style.height = `${totalH}px`;
+    if (this.bgImage) { this.bgImage.destroy(); this.bgImage = undefined; }
+    if (this.dimOverlay) { this.dimOverlay.destroy(); this.dimOverlay = undefined; }
+    if (this.hudBgFill) { this.hudBgFill.destroy(); this.hudBgFill = undefined; }
 
-    // ── Background ────────────────────────────────────────────────
-    const oldBg = this.children.list.find(
-      (c) => c instanceof Phaser.GameObjects.Image && c.texture.key === "board_bg"
+    this.bgImage = this.add.image(BASE_WIDTH / 2, TOTAL_HUD + baseBgH / 2, "board_bg");
+    this.bgImage.setDisplaySize(BASE_WIDTH, baseBgH);
+    this.bgImage.setDepth(0);
+
+    this.dimOverlay = this.add.rectangle(
+      BASE_WIDTH / 2, TOTAL_HUD + baseBgH / 2,
+      BASE_WIDTH, baseBgH, 0x353b42, 0.8,
     );
-    if (oldBg) oldBg.destroy();
+    this.dimOverlay.setDepth(1);
 
-    const bg = this.add.image(width / 2, TOTAL_HUD + bgDisplayH / 2, "board_bg");
-    bg.setDisplaySize(width, bgDisplayH);
-    bg.setDepth(0);
-
-    // Dim overlay
-    const dimOverlay = this.add.rectangle(width / 2, TOTAL_HUD + bgDisplayH / 2, width, bgDisplayH, 0x000000, 0.5);
-    dimOverlay.setDepth(1);
-
-    // Fill area above background (behind HUD) with solid color
-    const oldHudBg = this.children.list.find(
-      (c) => c instanceof Phaser.GameObjects.Rectangle && (c as any).name === "hud_bg_fill"
-    );
-    if (oldHudBg) oldHudBg.destroy();
-
-    const hudBgFill = this.add.rectangle(width / 2, TOTAL_HUD / 2, width, TOTAL_HUD, 0x0d1b2a, 1);
-    (hudBgFill as any).name = "hud_bg_fill";
-    hudBgFill.setDepth(0);
-
-    // ── Card Holders ──────────────────────────────────────────────
-    this.layoutCardHolders(width, bgDisplayH);
+    this.hudBgFill = this.add.rectangle(BASE_WIDTH / 2, TOTAL_HUD / 2, BASE_WIDTH, TOTAL_HUD, 0x0d1b2a, 1);
+    this.hudBgFill.setDepth(0);
   }
 
-  private layoutCardHolders(width: number, bgDisplayH: number) {
-    if (this.sustainableHolder) this.sustainableHolder.destroy();
-    if (this.exploitativeHolder) this.exploitativeHolder.destroy();
-
-    const holderY = TOTAL_HUD + bgDisplayH * 0.25;
-    const leftCenterX = width * 0.25;
-    const rightCenterX = width * 0.75;
-    const targetW = width * 0.38;
-
-    // ── Sustainable (blue) — LEFT ─────────────────────────────────
-    this.sustainableHolder = this.add.image(leftCenterX, holderY, "card_sustainable");
-    const susTexW = this.sustainableHolder.texture.getSourceImage().width;
-    this.sustainableHolder.setScale(targetW / susTexW);
-    this.sustainableHolder.setDepth(5);
-
-    // ── Exploitative (red) — RIGHT ────────────────────────────────
-    this.exploitativeHolder = this.add.image(rightCenterX, holderY, "card_exploitative");
-    const expTexW = this.exploitativeHolder.texture.getSourceImage().width;
-    this.exploitativeHolder.setScale(targetW / expTexW);
-    this.exploitativeHolder.setDepth(5);
-  }
-
-  // ─── HUD (fixed DOM overlay — stays at top while scrolling) ───────
-
-  private createHUD() {
-    const existing = document.getElementById("board-hud");
-    if (existing) existing.remove();
-
-    const parent = document.getElementById("game-container") ?? document.body;
-
-    const hud = document.createElement("div");
-    hud.id = "board-hud";
-    Object.assign(hud.style, {
-      position: "absolute",
-      top: "0",
-      left: "0",
-      width: "100%",
-      height: `${HUD_HEIGHT}px`,
-      background: "#0d1b2a",
-      zIndex: "100",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: "20px",
-      borderBottom: `${BORDER_HEIGHT}px solid #d4a843`,
-      boxSizing: "content-box",
-      fontFamily: '"Jersey 20", sans-serif',
-    });
-
-    this.players.forEach((player, i) => {
-      const card = document.createElement("div");
-      Object.assign(card.style, {
-        width: "100px",
-        height: "150px",
-        background: "rgba(26, 40, 64, 0.85)",
-        border: `2px solid ${player.isActive ? "#d4a843" : "#5a7a9a"}`,
-        borderRadius: "8px",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        boxSizing: "border-box",
-      });
-
-      const name = document.createElement("div");
-      name.textContent = player.name;
-      Object.assign(name.style, {
-        fontSize: "14px",
-        fontWeight: "bold",
-        color: player.isEliminated ? "#666666" : "#e8e4dc",
-        textDecoration: player.isEliminated ? "line-through" : "none",
-      });
-
-      const role = document.createElement("div");
-      role.textContent = player.role ?? "?";
-      Object.assign(role.style, {
-        fontSize: "11px",
-        fontWeight: "bold",
-        color: "#a0986c",
-        marginTop: "2px",
-      });
-
-      card.appendChild(name);
-      card.appendChild(role);
-      hud.appendChild(card);
-    });
-
-    parent.appendChild(hud);
-    this.hudEl = hud;
-  }
-
-  // ─── PUBLIC API (for game logic to call) ──────────────────────────
-
-  public updatePlayers(players: PlayerData[]) {
-    this.players = players;
-    this.createHUD();
-  }
+  // ─── PUBLIC API ───────────────────────────────────────────────
 
   public addSustainablePolicy() {
-    this.sustainableCount = Math.min(this.sustainableCount + 1, 5);
+    this.state.sustainableCount = Math.min(this.state.sustainableCount + 1, 5);
+    this.rebuildPolicyHolders();
   }
 
   public addExploitativePolicy() {
-    this.exploitativeCount = Math.min(this.exploitativeCount + 1, 3);
+    this.state.exploitativeCount = Math.min(this.state.exploitativeCount + 1, 3);
+    this.rebuildPolicyHolders();
   }
 
-  public setActivePlayer(index: number) {
-    this.players.forEach((p, i) => {
-      p.isActive = i === index;
-    });
-    this.createHUD();
-  }
-
-  public eliminatePlayer(index: number) {
-    if (this.players[index]) {
-      this.players[index].isEliminated = true;
-      this.createHUD();
-    }
-  }
-
-  public revealRole(index: number, role: string) {
-    if (this.players[index]) {
-      this.players[index].role = role;
-      this.createHUD();
-    }
-  }
-
-  // ─── CLEANUP ──────────────────────────────────────────────────────
+  // ─── CLEANUP ──────────────────────────────────────────────────
 
   private cleanup() {
-    if (this.hudEl) {
-      this.hudEl.remove();
-      this.hudEl = undefined;
+    if (this.socket) { this.socket.close(); this.socket = undefined; }
+    if (this.state.username) {
+      void leaveLobby(this.state.username, this.state.lobbyCode).catch(() => undefined);
     }
+    this.hudEl?.remove();
+    this.holdersEl?.remove();
+    this.drawPileEl?.remove();
+    this.nextRoundBtnEl?.remove();
+    this.electionTrackerEl?.remove();
+    this.hudEl = this.holdersEl = this.drawPileEl = this.nextRoundBtnEl = this.electionTrackerEl = undefined;
+
     if (this.resizeHandler) {
       window.removeEventListener("resize", this.resizeHandler);
       this.resizeHandler = undefined;
+    }
+
+    const overlays = [
+      "RoleScene", "VotingScene", "NominationScene",
+      "CharacterSelectionScene", "PolicyDescScene",
+      "DiscardPolicyScene", "PolicyEnactScene", "ContextScene",
+    ];
+    for (const name of overlays) {
+      if (this.scene.isActive(name)) this.scene.stop(name);
     }
   }
 }

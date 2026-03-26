@@ -1,13 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from data.database import get_connection
-from routes import lobby, results
-from ws import game
+from .data.database import get_connection
+from .data.seed import initialize_and_seed_database
+from .routes import lobby, results
+from .ws import game
+from .data import repository
 
-from data import repository
 
-app = FastAPI(title="GreenWatch", version="0.1.0")
+app = FastAPI(title="Greenwashed", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,7 +28,12 @@ app.include_router(game.router, tags=["game"])
 
 @app.on_event("startup")
 def on_startup():
-    get_connection()
+    try:
+        conn = get_connection()
+        conn.close()
+        initialize_and_seed_database()
+    except Exception as exc:
+        print(f"Database initialization unavailable at startup: {exc}")
 
 
 @app.get("/health")

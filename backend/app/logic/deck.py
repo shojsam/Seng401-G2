@@ -1,3 +1,9 @@
+"""
+deck.py — Shared policy deck for GREENWASHED.
+The deck is a shared draw pile (not personal hands).
+Cards are loaded from the database (cards table) at deck creation.
+Falls back to placeholder cards if the database is unavailable.
+"""
 import random
 from enum import Enum
 
@@ -8,68 +14,79 @@ class PolicyType(str, Enum):
 
 
 class PolicyCard:
-    def __init__(self, name: str, description: str, policy_type: PolicyType):
-        self.name = name
-        self.description = description
+    def __init__(self, policy_type: PolicyType, title: str = "", description: str = "", hover: str = ""):
         self.policy_type = policy_type
+        self.title = title
+        self.description = description
+        self.hover = hover
 
     def to_dict(self) -> dict:
         return {
-            "name": self.name,
-            "description": self.description,
             "policy_type": self.policy_type.value,
+            "title": self.title,
+            "description": self.description,
+            "hover": self.hover,
         }
 
 
-# ---------------------------------------------------------------------------
-# Card definitions — environment, economics, human rights, democratic freedoms
-# ---------------------------------------------------------------------------
-POLICY_CARDS: list[dict] = [
-    # TODO: add your card content here. Each entry should be a dict with:
-    #   "name": str,
-    #   "description": str,
-    #   "policy_type": "sustainable" or "exploitative"
-    #
-    # Example:
-    # {"name": "Fair Wage Act", "description": "Establish a living wage indexed to cost of living", "policy_type": "sustainable"},
-    # {"name": "Austerity for Recovery", "description": "Cut social spending to reduce national debt", "policy_type": "exploitative"},
-]
+# --- Deck creation ---
+# Fallback counts if DB is unavailable
+EXPLOITATIVE_COUNT = 11
+SUSTAINABLE_COUNT = 6
 
 
-def _build_pool(policy_type: PolicyType) -> list[PolicyCard]:
-    """Build a shuffled list of cards for one policy type."""
-    cards = [
-        PolicyCard(name=c["name"], description=c["description"], policy_type=policy_type)
-        for c in POLICY_CARDS
-        if c["policy_type"] == policy_type.value
-    ]
-    random.shuffle(cards)
-    return cards
+def _load_cards_from_db() -> list[PolicyCard] | None:
+    """Try to load cards from the database. Returns None on failure."""
+    try:
+        from ..data.repository import get_all_cards
+
+        rows = get_all_cards()
+        if not rows:
+            return None
+
+        deck: list[PolicyCard] = []
+        for row in rows:
+            card_type_str = str(row.get("card_type", "")).lower().strip()
+            if card_type_str == "sustainable":
+                policy_type = PolicyType.SUSTAINABLE
+            elif card_type_str == "exploitative":
+                policy_type = PolicyType.EXPLOITATIVE
+            else:
+                # Skip unknown card types
+                continue
+
+            title = str(row.get("card_name", "Policy"))
+            description = str(row.get("card_detail", "") or "")
+            hover = str(row.get("hover", "") or "")
+
+            deck.append(PolicyCard(policy_type, title=title, description=description, hover=hover))
+
+        if deck:
+            return deck
+        return None
+    except Exception as exc:
+        print(f"Could not load cards from database, using fallback: {exc}")
+        return None
 
 
-def deal_hands(
-    roles: dict[str, str],
-    cards_per_player: int = 5,
-) -> dict[str, list[PolicyCard]]:
-    """Deal cards to each player based on their role.
+def _create_fallback_deck() -> list[PolicyCard]:
+    """Create a fallback deck with placeholder names."""
+    deck: list[PolicyCard] = []
+    for i in range(EXPLOITATIVE_COUNT):
+        deck.append(PolicyCard(PolicyType.EXPLOITATIVE, title=f"Exploit #{i+1}"))
+    for i in range(SUSTAINABLE_COUNT):
+        deck.append(PolicyCard(PolicyType.SUSTAINABLE, title=f"Sustain #{i+1}"))
+    return deck
 
-    Reformers receive sustainable cards, Exploiters receive exploitative cards.
-    Returns a mapping of player_id -> list of PolicyCard.
-    """
-    sustainable_pool = _build_pool(PolicyType.SUSTAINABLE)
-    exploitative_pool = _build_pool(PolicyType.EXPLOITATIVE)
 
-    hands: dict[str, list[PolicyCard]] = {}
-    for player_id, role in roles.items():
-        if role in ("reformer", "REFORMER", "Reformer"):
-            pool = sustainable_pool
-        else:
-            pool = exploitative_pool
+def create_deck() -> list[PolicyCard]:
+    """Create a fresh policy deck, loading from the database if available."""
+    deck = _load_cards_from_db()
+    if deck is None:
+        deck = _create_fallback_deck()
+    return deck
 
-        hand: list[PolicyCard] = []
-        for _ in range(cards_per_player):
-            if pool:
-                hand.append(pool.pop())
-        hands[player_id] = hand
 
-    return hands
+def shuffle_deck(deck: list[PolicyCard]) -> None:
+    """Shuffle a deck in-place."""
+    random.shuffle(deck)
