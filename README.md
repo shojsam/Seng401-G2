@@ -166,4 +166,4 @@ Live URL: [https:
 
 ## License
 
-This project was developed as a course project for SENG 401 at the University of Calgary (Winter 2026).
+This project was developed as a course project for SENG 401 at the University of Calgary (Winter 2026)
