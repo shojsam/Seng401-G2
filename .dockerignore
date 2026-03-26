@@ -1,0 +1,8 @@
+.git
+.gitignore
+frontend
+**/__pycache__
+**/.pytest_cache
+**/*.pyc
+README.md
+*.pdf

@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { createLobby, joinLobby } from "../src/api";
 
 /**
  * Asset paths — adjust these to match your project's asset directory.
@@ -51,6 +52,7 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: `"Jersey 20", sans-serif`,
       color: "#f4efe7",
       boxSizing: "border-box",
+      imageRendering: "pixelated",
     });
 
     // ── Background image (full-bleed) ───────────────────────────────
@@ -62,6 +64,7 @@ export class MenuScene extends Phaser.Scene {
       backgroundSize: "cover",
       backgroundPosition: "center",
       backgroundRepeat: "no-repeat",
+      imageRendering: "pixelated",
       zIndex: "0",
     });
     container.appendChild(bg);
@@ -107,7 +110,8 @@ export class MenuScene extends Phaser.Scene {
       width: "60%",
       height: "auto",
       objectFit: "contain",
-      filter: "drop-shadow(0 6px 12px rgba(0,0,0,0.5))",
+      imageRendering: "pixelated",
+      filter: "drop-shadow(0 4px 0 rgba(0,0,0,0.6))",
     });
     logoWrap.appendChild(logo);
     wrapper.appendChild(logoWrap);
@@ -141,12 +145,12 @@ export class MenuScene extends Phaser.Scene {
     const joinButton = this.buildButton(
       "Join Session",
       "#37935a",
-      "#2e6d45",
+      "#1a4a2a",
       "#e0b66a"
     );
     const joinMessage = this.buildMessage();
 
-    joinButton.onclick = () => {
+    joinButton.onclick = async () => {
       const lobby = lobbyInput.value.trim();
       const username = joinNameInput.value.trim();
 
@@ -156,11 +160,24 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
 
+      joinButton.disabled = true;
       joinMessage.style.color = "#ccf0c8";
       joinMessage.textContent = `Joining ${lobby} as ${username}...`;
 
-      this.cleanup();
-      this.scene.start("BoardGameScene");
+      try {
+        const result = await joinLobby(username, lobby);
+        this.cleanup();
+        this.scene.start("BoardGameScene", {
+          username: result.username,
+          lobbyCode: result.lobby_code,
+        });
+      } catch (error) {
+        joinMessage.style.color = "#ffd3c8";
+        joinMessage.textContent =
+          error instanceof Error ? error.message : "Failed to join the lobby.";
+      } finally {
+        joinButton.disabled = false;
+      }
     };
 
     const enterJoin = (e: KeyboardEvent) => {
@@ -180,7 +197,7 @@ export class MenuScene extends Phaser.Scene {
     );
 
     // ── CREATE SESSION panel ────────────────────────────────────────
-    const createPanel = this.buildPanel("Create Session", "#1567b0", "#1567b0");
+    const createPanel = this.buildPanel("Create Session", "#2b9d65", "#2b9d65");
 
     createPanel.appendChild(
       this.buildDescription(
@@ -192,13 +209,13 @@ export class MenuScene extends Phaser.Scene {
     const createNameInput = this.buildInput("Enter your name", 12);
     const createButton = this.buildButton(
       "Create Session",
-      "#1567b0",
-      "#0c4b82",
+      "#37935a",
+      "#1a4a2a",
       "#e0b66a"
     );
     const createMessage = this.buildMessage();
 
-    createButton.onclick = () => {
+    createButton.onclick = async () => {
       const username = createNameInput.value.trim();
 
       if (!username) {
@@ -207,8 +224,24 @@ export class MenuScene extends Phaser.Scene {
         return;
       }
 
+      createButton.disabled = true;
       createMessage.style.color = "#cfe2ff";
       createMessage.textContent = `Creating a new session for ${username}...`;
+
+      try {
+        const result = await createLobby(username);
+        this.cleanup();
+        this.scene.start("BoardGameScene", {
+          username: result.username,
+          lobbyCode: result.lobby_code,
+        });
+      } catch (error) {
+        createMessage.style.color = "#ffd3c8";
+        createMessage.textContent =
+          error instanceof Error ? error.message : "Failed to create the lobby.";
+      } finally {
+        createButton.disabled = false;
+      }
     };
 
     createNameInput.addEventListener("keydown", (e: KeyboardEvent) => {
@@ -232,7 +265,6 @@ export class MenuScene extends Phaser.Scene {
       fontWeight: "400",
       textAlign: "center",
       letterSpacing: "1px",
-      textShadow: "0 2px 6px rgba(0,0,0,0.6)",
     });
     wrapper.appendChild(footer);
 
@@ -243,6 +275,12 @@ export class MenuScene extends Phaser.Scene {
     // ── Inject responsive breakpoint ────────────────────────────────
     const style = document.createElement("style");
     style.textContent = `
+      #menu-scene-ui * {
+        image-rendering: pixelated;
+        image-rendering: -moz-crisp-edges;
+        image-rendering: crisp-edges;
+      }
+
       @media (max-width: 820px) {
         #menu-scene-ui .menu-grid {
           grid-template-columns: 1fr !important;
@@ -257,7 +295,7 @@ export class MenuScene extends Phaser.Scene {
       }
 
       #menu-scene-ui button:hover {
-        filter: brightness(1.06);
+        filter: brightness(1.12);
       }
     `;
     document.head.appendChild(style);
@@ -269,13 +307,12 @@ export class MenuScene extends Phaser.Scene {
   private buildPanel(title: string, borderColor: string, lineColor: string): HTMLDivElement {
     const panel = document.createElement("div");
     Object.assign(panel.style, {
-      background: "rgba(12, 28, 40, 0.92)",
+      background: "rgba(42, 46, 51, 0.92)",
       border: `4px solid ${borderColor}`,
-      borderRadius: "18px",
       padding: "26px 26px 28px",
       boxSizing: "border-box",
-      boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
-      backdropFilter: "blur(4px)",
+      boxShadow: "6px 6px 0 rgba(0,0,0,0.5)",
+      imageRendering: "pixelated",
     });
 
     const heading = document.createElement("div");
@@ -284,11 +321,10 @@ export class MenuScene extends Phaser.Scene {
       fontSize: "48px",
       fontWeight: "400",
       textTransform: "uppercase",
-      color: "#f7f2ea",
+      color: "#e8e4dc",
       marginBottom: "14px",
       letterSpacing: "1px",
       fontFamily: `"Jersey 20", sans-serif`,
-      textShadow: "3px 3px 0 rgba(0,0,0,0.35)",
     });
 
     const divider = document.createElement("div");
@@ -296,7 +332,6 @@ export class MenuScene extends Phaser.Scene {
       width: "100%",
       height: "4px",
       background: lineColor,
-      borderRadius: "999px",
       marginBottom: "16px",
     });
 
@@ -314,7 +349,7 @@ export class MenuScene extends Phaser.Scene {
       fontWeight: "400",
       lineHeight: "1.3",
       letterSpacing: "0.5px",
-      color: "#d6d1c8",
+      color: "#9e9a92",
       marginBottom: "22px",
     });
     return desc;
@@ -326,7 +361,7 @@ export class MenuScene extends Phaser.Scene {
     Object.assign(label.style, {
       fontSize: "30px",
       fontWeight: "400",
-      color: "#e5e1db",
+      color: "#e8e4dc",
       marginBottom: "6px",
       fontFamily: `"Jersey 20", sans-serif`,
       letterSpacing: "0.5px",
@@ -343,8 +378,7 @@ export class MenuScene extends Phaser.Scene {
     Object.assign(input.style, {
       width: "100%",
       height: "62px",
-      borderRadius: "12px",
-      border: "3px solid #b9c2c7",
+      border: "3px solid #6b6355",
       background: "#e8e5df",
       color: "#232323",
       fontSize: "28px",
@@ -355,16 +389,18 @@ export class MenuScene extends Phaser.Scene {
       marginBottom: "18px",
       fontFamily: `"Jersey 20", sans-serif`,
       letterSpacing: "0.5px",
+      boxShadow: "4px 4px 0 rgba(0,0,0,0.3)",
+      imageRendering: "pixelated",
     });
 
     input.addEventListener("focus", () => {
       input.style.border = "3px solid #e0b66a";
-      input.style.boxShadow = "0 0 0 3px rgba(224,182,106,0.18)";
+      input.style.boxShadow = "4px 4px 0 rgba(0,0,0,0.3)";
     });
 
     input.addEventListener("blur", () => {
-      input.style.border = "3px solid #b9c2c7";
-      input.style.boxShadow = "none";
+      input.style.border = "3px solid #6b6355";
+      input.style.boxShadow = "4px 4px 0 rgba(0,0,0,0.3)";
     });
 
     return input;
@@ -382,34 +418,33 @@ export class MenuScene extends Phaser.Scene {
     Object.assign(btn.style, {
       width: "100%",
       height: "74px",
-      borderRadius: "14px",
-      border: `3px solid ${borderColor}`,
+      border: `4px solid ${borderColor}`,
       background: bg,
-      color: "#f8f4ed",
+      color: "#f0ebe3",
       fontSize: "34px",
       fontWeight: "400",
       textTransform: "uppercase",
       letterSpacing: "1px",
       cursor: "pointer",
-      boxShadow: `0 6px 0 ${shadow}`,
+      boxShadow: `4px 4px 0 ${shadow}`,
       fontFamily: `"Jersey 20", sans-serif`,
-      transition: "transform 0.08s, box-shadow 0.08s, filter 0.08s",
-      textShadow: "2px 2px 0 rgba(0,0,0,0.25)",
+      transition: "none",
+      imageRendering: "pixelated",
     });
 
     btn.addEventListener("mousedown", () => {
-      btn.style.transform = "translateY(3px)";
-      btn.style.boxShadow = `0 3px 0 ${shadow}`;
+      btn.style.transform = "translateX(4px) translateY(4px)";
+      btn.style.boxShadow = `0 0 0 ${shadow}`;
     });
 
     btn.addEventListener("mouseup", () => {
-      btn.style.transform = "translateY(0)";
-      btn.style.boxShadow = `0 6px 0 ${shadow}`;
+      btn.style.transform = "translateX(0) translateY(0)";
+      btn.style.boxShadow = `4px 4px 0 ${shadow}`;
     });
 
     btn.addEventListener("mouseleave", () => {
-      btn.style.transform = "translateY(0)";
-      btn.style.boxShadow = `0 6px 0 ${shadow}`;
+      btn.style.transform = "translateX(0) translateY(0)";
+      btn.style.boxShadow = `4px 4px 0 ${shadow}`;
     });
 
     return btn;
@@ -423,7 +458,7 @@ export class MenuScene extends Phaser.Scene {
       fontSize: "22px",
       fontWeight: "400",
       fontFamily: `"Jersey 20", sans-serif`,
-      color: "#d7d7d2",
+      color: "#9e9a92",
       letterSpacing: "0.5px",
     });
     return msg;
