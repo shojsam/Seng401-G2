@@ -1,49 +1,142 @@
-import unittest
-from unittest.mock import MagicMock, patch
+import pytest
+from unittest.mock import MagicMock, patch, mock_open
 
-from app.data.seed import seed_database
+from app.data.seed import (
+    initialize_database,
+    ensure_cards_hover_column,
+    seed_database,
+)
 
-class TestDatabaseSeeding(unittest.TestCase):
+def make_mock_connection(cursor_mock):
+    conn = MagicMock()
+    conn.cursor.return_value = cursor_mock
+    conn.database = "test_db"
+    return conn
 
-    @patch('app.data.seed.get_connection')
-    def test_seed_database_success(self, mock_get_conn):
-        """Test that seed_database calls executemany for both cards and users."""
-        mock_conn = MagicMock()
-        mock_cursor = MagicMock()
-        mock_get_conn.return_value = mock_conn
-        mock_conn.cursor.return_value = mock_cursor
 
+@patch("app.data.seed.get_connection")
+def test_initialize_database_already_initialized(mock_get_conn):
+    cursor = MagicMock()
+    cursor.fetchall.return_value = [
+        ("users",),
+        ("games",),
+        ("game_players",),
+        ("cards",),
+        ("lobbies",),
+        ("lobby_players",),
+    ]
+
+    conn = make_mock_connection(cursor)
+    mock_get_conn.return_value = conn
+
+    initialize_database()
+
+    cursor.execute.assert_called_with("SHOW TABLES")
+    conn.commit.assert_not_called()
+
+
+@patch("app.data.seed.get_connection")
+@patch("pathlib.Path.read_text")
+def test_initialize_database_runs_schema(mock_read_text, mock_get_conn):
+    cursor = MagicMock()
+    cursor.fetchall.return_value = [("users",)]
+
+    conn = make_mock_connection(cursor)
+    mock_get_conn.return_value = conn
+
+    mock_read_text.return_value = """
+        CREATE TABLE test1 (id INT);
+        CREATE TABLE test2 (id INT);
+    """
+
+    initialize_database()
+
+    assert cursor.execute.call_count >= 3 
+    conn.commit.assert_called_once()
+
+
+
+@patch("app.data.seed.get_connection")
+def test_hover_column_already_exists(mock_get_conn):
+    cursor = MagicMock()
+    cursor.fetchone.return_value = ("hover",)
+
+    conn = make_mock_connection(cursor)
+    mock_get_conn.return_value = conn
+
+    ensure_cards_hover_column()
+
+    cursor.execute.assert_called_once_with(
+        "SHOW COLUMNS FROM cards LIKE 'hover'"
+    )
+    conn.commit.assert_not_called()
+
+
+@patch("app.data.seed.get_connection")
+def test_hover_column_added(mock_get_conn):
+    cursor = MagicMock()
+    cursor.fetchone.return_value = None
+
+    conn = make_mock_connection(cursor)
+    mock_get_conn.return_value = conn
+
+    ensure_cards_hover_column()
+
+    assert cursor.execute.call_count == 2
+    conn.commit.assert_called_once()
+
+
+
+@patch("app.data.seed.get_connection")
+def test_seed_database_with_existing_users(mock_get_conn):
+    cursor = MagicMock()
+
+    cursor.fetchone.return_value = (5,) 
+
+    conn = make_mock_connection(cursor)
+    mock_get_conn.return_value = conn
+
+    seed_database()
+
+    cursor.execute.assert_any_call("DELETE FROM cards")
+    insert_calls = [
+        call for call in cursor.executemany.call_args_list
+        if "INSERT INTO users" in str(call)
+    ]
+    assert not insert_calls
+
+    conn.commit.assert_called_once()
+
+
+@patch("app.data.seed.get_connection")
+def test_seed_database_with_no_users(mock_get_conn):
+    cursor = MagicMock()
+
+    cursor.fetchone.return_value = (0,)
+
+    conn = make_mock_connection(cursor)
+    mock_get_conn.return_value = conn
+
+    seed_database()
+
+    assert any(
+        "INSERT INTO users" in str(call)
+        for call in cursor.executemany.call_args_list
+    )
+
+    conn.commit.assert_called_once()
+
+
+@patch("app.data.seed.get_connection")
+def test_seed_database_rollback_on_error(mock_get_conn):
+    cursor = MagicMock()
+
+    cursor.execute.side_effect = Exception("DB error")
+
+    conn = make_mock_connection(cursor)
+    mock_get_conn.return_value = conn
+
+    with pytest.raises(Exception):
         seed_database()
 
-        self.assertEqual(mock_cursor.executemany.call_count, 2)
-
-        card_query = "INSERT INTO cards (card_name, card_type, card_detail) VALUES (%s, %s, %s)"
-        first_call_args = mock_cursor.executemany.call_args_list[0]
-        self.assertEqual(first_call_args[0][0], card_query)
-        self.assertEqual(len(first_call_args[0][1]), 4) 
-
-        user_query = "INSERT INTO users (username, password, total_games_played, total_wins, total_losses) VALUES (%s, %s, %s, %s, %s)"
-        second_call_args = mock_cursor.executemany.call_args_list[1]
-        self.assertEqual(second_call_args[0][0], user_query)
-        self.assertEqual(len(second_call_args[0][1]), 3) 
-
-        mock_conn.commit.assert_called_once()
-        mock_conn.close.assert_called_once()
-
-    @patch('app.data.seed.get_connection')
-    def test_seed_database_error(self, mock_get_conn):
-        """Test that if seeding fails, rollback is called."""
-        mock_conn = MagicMock()
-        mock_cursor = MagicMock()
-        mock_get_conn.return_value = mock_conn
-        mock_conn.cursor.return_value = mock_cursor
-        
-        mock_cursor.executemany.side_effect = [None, Exception("User table full")]
-
-        seed_database()
-
-        mock_conn.rollback.assert_called_once()
-        mock_conn.close.assert_called_once()
-
-if __name__ == '__main__':
-    unittest.main()
+    conn.rollback.assert_called_once()

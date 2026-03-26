@@ -52,5 +52,31 @@ class TestDatabase(unittest.TestCase):
         mock_cursor.close.assert_called_once()
         mock_conn.close.assert_called_once()
 
+    @patch('app.data.database.get_connection')
+    def test_execute_query_with_params(self, mock_get_conn):
+        cursor = MagicMock()
+        conn = MagicMock()
+        conn.cursor.return_value = cursor
+
+        mock_get_conn.return_value = conn
+
+        db_manager.execute_query("SELECT * FROM users WHERE id=%s", (1,))
+
+        cursor.execute.assert_called_once_with(
+            "SELECT * FROM users WHERE id=%s", (1,)
+        )
+
+    @patch("app.data.database._get_pool")
+    def test_get_connection(self, mock_get_pool):
+        mock_conn = MagicMock()
+        mock_pool = MagicMock()
+        mock_pool.get_connection.return_value = mock_conn
+
+        mock_get_pool.return_value = mock_pool
+
+        conn = db_manager.get_connection()
+
+        assert conn == mock_conn
+        mock_pool.get_connection.assert_called_once()
 if __name__ == '__main__':
     unittest.main()

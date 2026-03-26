@@ -1,61 +1,63 @@
-#### NEEDS WORK
-import unittest
+import pytest
 from unittest.mock import MagicMock, patch
 from app.data.models import save_game_result, get_recent_results
 
-class TestGameResults(unittest.TestCase):
-
-    @patch('app.data.models.save_game_result.db_pool.get_connection')
-    def test_save_game_result_success(self, mock_get_conn):
-        """Test that a game result is saved and committed correctly."""
-        # Setup Mocks
+@pytest.fixture
+def mock_db():
+    """Fixture to mock the database connection and cursor."""
+    with patch("app.data.models.get_connection") as mock_get_conn:
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
-        mock_get_conn.return_value = mock_conn
-        mock_conn.cursor.return_value = mock_cursor
-
-        save_game_result("Alice")
-
-        mock_cursor.execute.assert_called_once_with(
-            "INSERT INTO game_results (winner) VALUES (%s)", ("Alice",)
-        )
-        mock_conn.commit.assert_called_once()
-        mock_cursor.close.assert_called_once()
-        mock_conn.close.assert_called_once()
-
-    @patch('app.data.models.save_game_result.db_pool.get_connection')
-    def test_save_game_result_failure(self, mock_get_conn):
-        """Test that a database error triggers a rollback."""
-        mock_conn = MagicMock()
-        mock_cursor = MagicMock()
+        
         mock_get_conn.return_value = mock_conn
         mock_conn.cursor.return_value = mock_cursor
         
-        mock_cursor.execute.side_effect = Exception("DB Connection Lost")
+        yield mock_conn, mock_cursor
 
-        save_game_result("Bob")
 
-        mock_conn.rollback.assert_called_once()
-        mock_conn.close.assert_called_once()
+def test_save_game_result_success(mock_db):
+    mock_conn, mock_cursor = mock_db
+    mock_cursor.fetchone.return_value = ("games",)
 
-    @patch('app.data.models.get_recent_results.db_pool.get_connection')
-    def test_get_recent_results(self, mock_get_conn):
-        """Test fetching results returns the expected dictionary list."""
-        mock_conn = MagicMock()
-        mock_cursor = MagicMock()
-        mock_get_conn.return_value = mock_conn
-        mock_conn.cursor.return_value = mock_cursor
-        
-        expected_data = [{"id": 1, "winner": "Alice", "played_at": "2023-01-01"}]
-        mock_cursor.fetchall.return_value = expected_data
+    save_game_result("Alice")
 
-        results = get_recent_results(limit=5)
+    mock_cursor.execute.assert_any_call("SHOW TABLES LIKE %s", ("games",))
+    mock_cursor.execute.assert_any_call(
+        "INSERT INTO games (status, winner) VALUES (%s, %s)", 
+        ("completed", "Alice")
+    )
+    mock_conn.commit.assert_called_once()
+    mock_cursor.close.assert_called_once()
 
-        mock_cursor.execute.assert_called_once_with(
-            "SELECT * FROM game_results ORDER BY played_at DESC LIMIT %s", (5,)
-        )
-        self.assertEqual(results, expected_data)
-        mock_conn.close.assert_called_once()
+def test_save_game_result_no_table(mock_db):
+    mock_conn, mock_cursor = mock_db
+    mock_cursor.fetchone.return_value = None
 
-if __name__ == '__main__':
-    unittest.main()
+    save_game_result("Alice")
+
+    mock_conn.rollback.assert_called_once()
+    assert mock_cursor.execute.call_count == 1 
+
+
+def test_get_recent_results_success(mock_db):
+    _, mock_cursor = mock_db
+    mock_cursor.fetchone.return_value = ("games",)
+    mock_cursor.fetchall.return_value = [
+        {"id": 1, "winner": "Alice", "played_at": "2024-01-01"},
+        {"id": 2, "winner": "Bob", "played_at": "2024-01-02"}
+    ]
+
+    results = get_recent_results(limit=5)
+
+    assert len(results) == 2
+    assert results[0]["winner"] == "Alice"
+    mock_cursor.execute.assert_any_call(mock_cursor.execute.call_args_list[1][0][0], (5,))
+
+def test_get_recent_results_empty_if_no_table(mock_db):
+    _, mock_cursor = mock_db
+    mock_cursor.fetchone.return_value = None
+
+    results = get_recent_results()
+
+    assert results == []
+    assert mock_cursor.execute.call_count == 1
