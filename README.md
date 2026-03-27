@@ -9,9 +9,13 @@ A real-time multiplayer social deduction card game that teaches players about gr
 Greenwash is inspired by Secret Hitler and Mafia. Players are secretly assigned as **Reformers** (pushing real sustainable policies) or **Exploiters** (pushing greenwashed/exploitative policies). Through a Leader/Vice legislative process, players debate, vote, and try to identify who is genuine while Exploiters attempt to pass harmful policies undetected.
 
 The game addresses three UN Sustainable Development Goals:
+- **SDG 7** — Affordable and Clean Energy
+- **SDG 10** — Reduced Inequalities
+- **SDG 11** — Sustainable Cities and Communities
 - **SDG 12** — Responsible Consumption & Production
 - **SDG 13** — Climate Action
 - **SDG 16** — Peace, Justice & Strong Institutions
+
 
 ## How to Play
 
