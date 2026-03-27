@@ -2,7 +2,7 @@
 
 A real-time multiplayer social deduction card game that teaches players about greenwashing and sustainable policy-making, built for SENG 401 (University of Calgary, Winter 2026).
 
-**Live Game:** [https://
+**Live Game:** [https://front-end-production-c64e.up.railway.app/]
 
 ## About the Game
 
@@ -165,7 +165,7 @@ The game is deployed on [Railway](https://railway.app):
 - **Frontend:** Node container serving Vite build
 - **Database:** Railway-managed MySQL instance
 
-Live URL: [https:
+Live URL: [https://front-end-production-c64e.up.railway.app/]
 ## Team — Group 02
 
 ## License
