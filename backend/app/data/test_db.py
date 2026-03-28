@@ -1,15 +1,24 @@
 import unittest
-from repository import get_all_cards
+from unittest.mock import MagicMock, patch
+from app.data.repository import get_all_cards
+
 
 class TestDatabase(unittest.TestCase):
-    def test_get_all_cards_returns_list(self):
-        # Act
-        results = get_all_cards()
-    
-        # Assert
-        self.assertIsInstance(results, list)
-        if len(results) > 0:
-            self.assertIn('card_name', results[0])
+    @patch("app.data.repository.get_connection")
+    def test_get_all_cards_returns_list(self, mock_get_conn):
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_get_conn.return_value = mock_conn
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.fetchall.return_value = [
+            {"card_id": 1, "card_name": "Test Card"},
+        ]
 
-if __name__ == '__main__':
+        results = get_all_cards()
+
+        self.assertIsInstance(results, list)
+        self.assertIn("card_name", results[0])
+
+
+if __name__ == "__main__":
     unittest.main()
