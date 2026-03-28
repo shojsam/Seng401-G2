@@ -708,11 +708,17 @@ async def game_ws(websocket: WebSocket, lobby_code: str, username: str):
         await broadcast_lobby_state(lobby)
 
         if lobby.game_state and lobby.game_state.phase != Phase.GAME_OVER:
+            lobby.game_state.phase = Phase.GAME_OVER
+            lobby.game_state.winner = None
             await broadcast(lobby, {
-                "type": "player_disconnected",
+                "type": "game_over",
                 "data": {
                     "lobby_code": lobby.code,
-                    "username": username,
-                    "message": f"{username} disconnected from the game.",
+                    "winner": "none",
+                    "disconnected_player": username,
+                    "summary": lobby.game_state.get_summary(),
+                    "players": lobby.game_state.player_ids,
+                    "character_selections": getattr(lobby, "character_selections", {}),
+                    "message": f"{username} disconnected. Game ended.",
                 },
             })

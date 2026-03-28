@@ -128,9 +128,10 @@ export class GameOverScene extends Phaser.Scene {
     if (existing) existing.remove();
 
     const parent = document.getElementById("game-container") ?? document.body;
+    const isDisconnect = this.winner === "none";
     const isReformers = this.winner === "reformers";
-    const accentColor = isReformers ? "#66785a" : "#842929";
-    const accentBorder = isReformers ? "#809671" : "#bc6262";
+    const accentColor = isDisconnect ? "#7a6a52" : isReformers ? "#66785a" : "#842929";
+    const accentBorder = isDisconnect ? "#bfa76a" : isReformers ? "#809671" : "#bc6262";
 
     const container = document.createElement("div");
     container.id = "game-over-scene";
@@ -173,7 +174,7 @@ export class GameOverScene extends Phaser.Scene {
     Object.assign(banner.style, { display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" });
 
     const bannerTitle = document.createElement("div");
-    bannerTitle.textContent = isReformers ? "REFORMERS WIN" : "EXPLOITERS WIN";
+    bannerTitle.textContent = isDisconnect ? "GAME ENDED" : isReformers ? "REFORMERS WIN" : "EXPLOITERS WIN";
     Object.assign(bannerTitle.style, {
       fontSize: "72px", fontWeight: "400", color: accentBorder,
       letterSpacing: "6px", textAlign: "center",
@@ -182,7 +183,7 @@ export class GameOverScene extends Phaser.Scene {
     banner.appendChild(bannerTitle);
 
     const bannerSub = document.createElement("div");
-    bannerSub.textContent = isReformers ? "Sustainable policies prevailed." : "Exploitative policies dominated.";
+    bannerSub.textContent = isDisconnect ? "A player disconnected." : isReformers ? "Sustainable policies prevailed." : "Exploitative policies dominated.";
     Object.assign(bannerSub.style, { fontSize: "28px", color: "#d4cfc5", letterSpacing: "2px", textAlign: "center" });
     banner.appendChild(bannerSub);
 
