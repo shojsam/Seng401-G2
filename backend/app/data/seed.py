@@ -205,6 +205,18 @@ def seed_database():
                 "This policy is EXPLOITATIVE.\n\nWorkers are required to perform labor without compensation, removing their primary source of income. As a result, many individuals are unable to meet basic needs such as housing, food, and healthcare.\n\nEmployers benefit from significantly reduced labor costs and increased productivity, while workers receive no financial return for their efforts.\n\nThere is no incentive for companies to transition these workers into paid roles, and labor protections are effectively eliminated.\n\nEconomic output may increase, but it is achieved through the direct exploitation of workers.",
             ),
             (
+                "Unrestricted Personal Data Collection",
+                "exploitative",
+                "Allow unrestricted data collection and sale of personal information by companies to support innovation and targeted services.\n\nThis policy removes privacy restrictions to enable full use of consumer data in digital markets.",
+                "This policy is EXPLOITATIVE.\n\nCompanies are allowed to collect, store, and sell personal data without meaningful limits. This includes browsing behavior, location data, and personal preferences.\n\nIndividuals lose control over how their information is used. Data can be sold to third parties without clear consent.\n\nAt the same time, large datasets increase corporate power and influence. Privacy is reduced. Surveillance becomes normalized.\n\nProfit is generated from personal information. Control over that information is lost.",
+            ),
+            (
+                "Deregulated Hazardous Waste Disposal",
+                "exploitative",
+                "Remove environmental protections on hazardous waste disposal to reduce costs and accelerate industrial activity.\n\nThis policy allows companies to manage waste independently without strict regulatory oversight.",
+                "This policy is EXPLOITATIVE.\n\nHazardous waste is handled with minimal oversight. Companies are allowed to dispose of waste in ways that reduce their costs, rather than protect the environment.\n\nToxic materials can enter soil, air, and water systems. Communities are exposed to increased health risks, including long-term illnesses.\n\nEnvironmental damage accumulates over time and is often irreversible.\n\nWhile companies benefit from lower operating costs, the consequences are transferred to the public and the environment.\n\nShort-term efficiency is gained. Long-term harm is ignored.",
+            ),
+            (
                 "Clean Water Infrastructure Investment",
                 "sustainable",
                 "Improve access to clean drinking water by investing in public water infrastructure, protecting natural water sources, and regulating pollution.\n\nThis policy aims to increase the availability of safe and affordable water for communities.",
